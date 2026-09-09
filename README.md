@@ -10,16 +10,15 @@
 - **只管壳子**：`index.html` / 部署 workflow / docsify 资源由模板托管；Markdown 是你自己的，升级永不覆盖内容
 - **自带部署**：生成 GitHub Actions workflow，push `docs/` 即发布到 Pages
 - **开箱即用**：明暗主题切换（跟随系统 + 记忆）、全文搜索、emoji favicon、侧边栏
+- **子目录统一侧边栏**：`zh-CN/`、`en/` 等子目录页面自动共用根侧边栏，不用每个目录再放一份
 
-## 用法
+## 新项目接入
 
 在**目标仓库根目录**：
 
 ```bash
-# 1. 拿到本仓库
 git clone https://github.com/redtidev1918/docsite.git /tmp/docsite
 
-# 2. 初始化（可反复试，内容文件已存在时不会覆盖）
 python3 /tmp/docsite/docsite.py init \
   --repo owner/name \
   --name 显示名 \
@@ -39,42 +38,78 @@ python3 /tmp/docsite/docsite.py init \
 生成：
 
 ```
-.docsite.json                 # 本项目的配置
-.github/workflows/docs.yml    # Pages 部署（托管）
+.docsite.json                 # 本项目的配置（提交进仓库）
+.github/workflows/docs.yml    # Pages 部署（托管，别手改）
 docs/
-├── index.html                # docsify 外壳（托管）
+├── index.html                # docsify 外壳（托管，别手改）
 ├── .nojekyll
-├── _sidebar.md               # 侧边栏（你的，只在缺失时创建骨架）
-├── README.md                 # 首页（你的）
-├── QUICKSTART.md             # 示例页（你的）
+├── _sidebar.md               # 侧边栏（你的内容）
+├── README.md                 # 首页（你的内容）
+├── QUICKSTART.md             # 示例页（你的内容）
 └── assets/vendor/            # docsify + 主题 + 搜索（托管）
 ```
 
-推送后 workflow 自动部署；仓库 **Settings → Pages → Source 选 GitHub Actions**（首次一般会自动配好）。
+推送后 workflow 自动部署；仓库 **Settings → Pages → Source 选 GitHub Actions**（首次一般自动配好）。
 站点地址：`https://<owner>.github.io/<name>/`
 
-## 写文档
+## 老项目接入（已经有 docs/ 或文档站）
 
-- 往 `docs/` 加 Markdown，在 `docs/_sidebar.md` 里加链接即可
-- 首页是 `docs/README.md`
-- 子目录页面（如 `zh-CN/`）自动共用根 `_sidebar.md`（模板用 `alias` 强制）；因此侧边栏链接一律写**根绝对路径**，如 `[快速开始](/zh-CN/quick-start.md)`，不要写相对路径
-- 各语言文档内正文的相互链接仍用普通相对路径即可（如 `[English](../)`)
+同样在仓库根跑 `init`，它对老项目有保护：
 
+- 已有的 `docs/index.html`、`.github/workflows/docs.yml` 如果**不是** docsite 托管文件，会先备份成 `*.docsite.bak`，不静默覆盖
+- 检测到别的文件名的 Pages workflow（如 `static.yml`）只提示不删除
+- 已有的 Markdown（`README.md`、`_sidebar.md` 等）一律不动
 
-
-## 升级模板
-
-模板更新后，在每个接入的仓库根目录跑：
+步骤：
 
 ```bash
+# 1. init（参数见上）
+python3 /tmp/docsite/docsite.py init --repo owner/name --name 显示名 --emoji 🐱
+
+# 2. 检查差异与备份
+git status
+#    - 核对 docs/index.html.docsite.bak（旧站若有自定义，把必要内容并回模板配置）
+#    - 旧部署 workflow（如 static.yml）确认 docs.yml 部署成功后删除，避免重复部署
+
+# 3. 侧边栏约定：链接写「根绝对路径」，子目录页面才能跳对
+#    [架构](/ARCHITECTURE.md)   ✅
+#    [架构](ARCHITECTURE.md)    ❌ 在 zh-CN/ 子页面会 404
+
+git add -A && git commit -m "docs: 接入 docsite" && git push
+```
+
+> Jekyll / mkdocs 等其他构建迁过来：内容文件保留，删掉对应的构建配置（`_config.yml`、`mkdocs.yml` 等）和旧 workflow 即可，新方案不需要构建。
+
+## 日常更新文档（最常用）
+
+不用再跑脚本，直接改 Markdown：
+
+1. 往 `docs/` 加 / 改 `.md` 文件
+2. 在 `docs/_sidebar.md` 里加链接（根绝对路径：`- [标题](/PAGE.md)`）
+3. `git commit && git push`——workflow 监听 `docs/**` 变化，一两分钟后线上更新
+
+多语言就建子目录（`docs/zh-CN/`、`docs/en/`），根侧边栏统一列链接；正文内部互链用普通相对路径（如 `[English](../)`）。
+
+## 升级 docsite 模板
+
+模板更新后（换 docsify 版本、改样式、加功能），在每个接入仓库的根目录：
+
+```bash
+git -C /tmp/docsite pull          # 更新脚手架本体
 python3 /tmp/docsite/docsite.py update
 ```
 
-只重写三个托管部分（`index.html`、workflow、vendor），按 `.docsite.json` 重新渲染；**Markdown 一律不碰**。看 diff、提交、推送。
+`update` 只重写托管部分（`index.html`、`docs.yml`、`assets/vendor/`），按 `.docsite.json` 重新渲染，**Markdown 一律不碰**。看 diff、提交、推送。
+在多个仓库批量升级就是在各仓库各跑一次——刻意不做一键全仓升级，让每个仓库的 diff 可见可控。
 
-## 升级 docsify
+## 已接入站点的参数参考
 
-替换 `template/assets/vendor/` 里的文件并提交本仓库，然后各项目执行 `update`。
+| 项目 | 命令要点 |
+| :-- | :-- |
+| PixivFlow | `--name PixivFlow --emoji 🐱 --branch master --theme-key pf-theme` |
+| dakit | `--name DAKit --emoji 🎨 --theme-key dakit-theme` |
+| TelePost | `--name TelePost --emoji 📮 --theme-key tp-theme` |
+| releasegraph | `--name ReleaseGraph --emoji 🕸️ --theme-key rg-theme` |
 
 ## 非目标
 

@@ -86,11 +86,26 @@ def cmd_init(args):
         if write_file(Path("docs") / name_, text, overwrite=False):
             print(f"  + docs/{name_}")
 
-    # 托管文件：init 时直接写
+    # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
     for tpl, dst in MANAGED.items():
+        d = Path(dst)
+        if d.exists() and "docsite: managed file" not in d.read_text(encoding="utf-8", errors="ignore")[:400]:
+            bak = Path(str(d) + ".docsite.bak")
+            shutil.copy2(d, bak)
+            print(f"  ! {dst} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
         text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
-        write_file(Path(dst), text, overwrite=True)
+        write_file(d, text, overwrite=True)
         print(f"  + {dst}")
+
+    # 老项目可能用别的文件名部署 Pages（如 static.yml），不删，只提示
+    wf_dir = Path(".github/workflows")
+    if wf_dir.exists():
+        for wf in sorted(wf_dir.glob("*.yml")):
+            if wf.name == "docs.yml":
+                continue
+            txt = wf.read_text(encoding="utf-8", errors="ignore")
+            if "deploy-pages" in txt or "upload-pages-artifact" in txt:
+                print(f"  ! 发现另一个 Pages workflow：{wf}，确认新流程正常后请删除，避免重复部署")
 
     copy_vendor(overwrite=True)
     write_file(Path("docs/.nojekyll"), "", overwrite=True)
