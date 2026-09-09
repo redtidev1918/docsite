@@ -57,7 +57,10 @@ docs/
 
 - 往 `docs/` 加 Markdown，在 `docs/_sidebar.md` 里加链接即可
 - 首页是 `docs/README.md`
-- 子目录（如 `zh-CN/`）内的页面不显示侧边栏，这是 docsify 的默认行为；文内放返回链接即可
+- 子目录页面（如 `zh-CN/`）自动共用根 `_sidebar.md`（模板用 `alias` 强制）；因此侧边栏链接一律写**根绝对路径**，如 `[快速开始](/zh-CN/quick-start.md)`，不要写相对路径
+- 各语言文档内正文的相互链接仍用普通相对路径即可（如 `[English](../)`)
+
+
 
 ## 升级模板
 

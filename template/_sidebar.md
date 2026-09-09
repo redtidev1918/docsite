@@ -1,2 +1,2 @@
 - [文档中心](/)
-- [快速开始](QUICKSTART.md)
+- [快速开始](/QUICKSTART.md)
