@@ -413,7 +413,8 @@ def cmd_navcheck(args):
         _navcheck_sidebar(root.name, zh, is_en=False, cfg=cfg, issues=issues)
         en = root / "docs/en/_sidebar.md"
         en_pages = [p for p in (root / "docs/en").glob("*.md")] if (root / "docs/en").is_dir() else []
-        if en_pages and not en.is_file():
+        # 英文内容在根 README.en.md 的 CDN 壳仓（已声明 allowCombinedLocales）不要求 en sidebar
+        if en_pages and not en.is_file() and not cfg["allowCombinedLocales"]:
             issues.append((f"{root.name}/en", "EN_SIDEBAR_MISSING",
                            "docs/en/ 有页面但没有 docs/en/_sidebar.md", "error"))
         elif en.is_file():
