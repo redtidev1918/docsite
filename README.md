@@ -327,6 +327,19 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
 }
 ```
 
+**schema 为白名单制**：`navigation` 下仅允许 `allowSidebarAnchors`、`allowCombinedLocales`
+两个字段，且必须为布尔值。未知字段、错误类型、非法 JSON 都会被 `navcheck` 以
+`NAVIGATION_SCHEMA`（error）拒绝——例外是仓库声明自己的能力边界，不是万能逃生口，
+不允许长出 `ignoreEverything` 之类的字段。
+
+**CI gate**：本仓库的 `.github/workflows/navcheck.yml` 每周与相关文件变更时，
+对全部受管仓库运行 `docsite.py navcheck --all`——红即契约被破坏。
+
+**正式治理定义（导航 contract）**：
+
+> `docsite.py navcheck --all` 全绿，表示所有受管仓库满足 canonical 导航结构约束；
+> 任何结构性例外必须由仓库通过 `.docsite.json` 显式声明，checker 不允许静默兼容。
+
 ### 特殊规范文件
 
 沿用「机器生成 / 合规 / 行业约定文件」例外：`CHANGELOG.md`、`LICENSE`、

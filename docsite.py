@@ -267,22 +267,38 @@ def cmd_check(args):
 NAV_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
 
+_NAVIGATION_FIELDS = {"allowSidebarAnchors", "allowCombinedLocales"}
+
+
 def _nav_config(root):
     """读取仓库的显式导航例外配置（.docsite.json 的 navigation 字段）。
 
-    未配置时全部为 False：检查器按默认规约执行，绝不静默忽略。
+    schema 为白名单制：仅允许上面两个字段，且必须为布尔值；未知字段、错误类型、
+    整个文件非法 JSON 都属于「配置非法」，由调用方按 error 上报——
+    不给「万能逃生口」留生长空间。未配置时全部为 False，绝不静默忽略。
     """
-    cfg = root / ".docsite.json"
-    nav = {}
-    if cfg.exists():
-        try:
-            nav = json.loads(cfg.read_text(encoding="utf-8")).get("navigation") or {}
-        except json.JSONDecodeError:
-            pass
-    return {
-        "allowSidebarAnchors": bool(nav.get("allowSidebarAnchors")),
-        "allowCombinedLocales": bool(nav.get("allowCombinedLocales")),
-    }
+    path = root / ".docsite.json"
+    cfg = {"allowSidebarAnchors": False, "allowCombinedLocales": False}
+    problems = []
+    if not path.exists():
+        return cfg, problems
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return cfg, [f".docsite.json 不是合法 JSON（{e}）"]
+    nav = doc.get("navigation")
+    if nav is None:
+        return cfg, problems
+    if not isinstance(nav, dict):
+        return cfg, [".docsite.json 的 navigation 必须是对象"]
+    for key, value in nav.items():
+        if key not in _NAVIGATION_FIELDS:
+            problems.append(f"navigation.{key} 不是允许的字段（白名单：{', '.join(sorted(_NAVIGATION_FIELDS))}）")
+        elif not isinstance(value, bool):
+            problems.append(f"navigation.{key} 必须是布尔值")
+        else:
+            cfg[key] = value
+    return cfg, problems
 
 
 def _sidebar_items(text):
@@ -358,19 +374,6 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
         if len(children) == 1:
             issues.append((name, "SINGLE_PAGE_CATEGORY",
                            f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
-    if not is_en and not cfg["allowCombinedLocales"]:
-        for indent, label, target in items:
-            # 标注「（英文）」的单条 fallback 链接允许（规则 20 的对称场景：
-            # 页面仅有英文版时，中文侧边栏可显式标注后指向它）；整棵英文树仍然禁止
-            if target and target.startswith("/en/") and not re.search(r"英文|English", label):
-                issues.append((name, "COMBINED_LOCALES",
-                               f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md；"
-                               "确需指向英文页必须在标题中标注（英文）", "error"))
-                break
-    for label, children in roots:
-        if len(children) == 1:
-            issues.append((name, "SINGLE_PAGE_CATEGORY",
-                           f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
 
 
 def cmd_navcheck(args):
@@ -384,6 +387,8 @@ def cmd_navcheck(args):
       DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
       GLOBAL_SIDEBAR_ALIAS  index.html 用 '/.*/_sidebar.md' 通配 alias 强制根侧边栏
                          （破坏分语言导航，docsify 原生按目录解析即可，无需 alias）
+      NAVIGATION_SCHEMA  .docsite.json 的 navigation 字段非法（未知字段 / 非布尔值 /
+                         非法 JSON）——白名单制，不给万能逃生口
     warning（仅提示，不影响退出码）：
       SINGLE_PAGE_CATEGORY 顶级分类只有 1 个页面
       NOT_ROOT_ABSOLUTE   本地链接未用根绝对路径
@@ -408,8 +413,10 @@ def cmd_navcheck(args):
         if not zh.is_file():
             continue  # 无导航的仓库（如 docsite 自身）不参与
         checked += 1
-        cfg = _nav_config(root)
+        cfg, schema_problems = _nav_config(root)
         issues = []
+        for problem in schema_problems:
+            issues.append((root.name, "NAVIGATION_SCHEMA", problem, "error"))
         _navcheck_sidebar(root.name, zh, is_en=False, cfg=cfg, issues=issues)
         en = root / "docs/en/_sidebar.md"
         en_pages = [p for p in (root / "docs/en").glob("*.md")] if (root / "docs/en").is_dir() else []
