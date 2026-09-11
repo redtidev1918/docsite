@@ -4,13 +4,17 @@
     python3 docsite.py init --repo owner/name [--name 名] [--emoji 📘] [--branch main]
     python3 docsite.py update
     python3 docsite.py check [仓库路径 ...] [--all 父目录]
+    python3 docsite.py navcheck [仓库路径 ...] [--all 父目录]
 
-init   在当前仓库生成 docs/ 与 Pages 部署 workflow。
-update 只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
-       永远不动你写的 Markdown。
-check  校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
+init      在当前仓库生成 docs/ 与 Pages 部署 workflow。
+update    只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
+          永远不动你写的 Markdown。
+check     校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
+navcheck  校验导航信息架构规约（确定性规则：语言侧边栏分离、无页内锚点、
+          无重复链接、en 侧边栏存在；单页面分类等软规则仅 warning）。
 
-统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/。
+统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/；
+语言是站点维度——docs/_sidebar.md 与 docs/en/_sidebar.md 各自只显示当前语言。
 配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
 """
 import argparse
@@ -26,7 +30,7 @@ CONFIG = Path(".docsite.json")
 # init 时创建、但 update 永不覆盖的内容文件（docs/ 根 = 中文）
 CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
 # 英文镜像内容（docs/en/ 下同名文件）
-EN_CONTENT_FILES = ["README.md", "QUICKSTART.md", "download.md"]
+EN_CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
 # 托管且要求「跨仓库逐字节一致」的文件（下载页生成链路）。
 # 不含模板 token，因此可直接比对；docsite.py check 用它做一致性校验。
 SYNCED = {
@@ -260,6 +264,150 @@ def cmd_check(args):
     return 0
 
 
+NAV_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+
+def _nav_config(root):
+    """读取仓库的显式导航例外配置（.docsite.json 的 navigation 字段）。
+
+    未配置时全部为 False：检查器按默认规约执行，绝不静默忽略。
+    """
+    cfg = root / ".docsite.json"
+    nav = {}
+    if cfg.exists():
+        try:
+            nav = json.loads(cfg.read_text(encoding="utf-8")).get("navigation") or {}
+        except json.JSONDecodeError:
+            pass
+    return {
+        "allowSidebarAnchors": bool(nav.get("allowSidebarAnchors")),
+        "allowCombinedLocales": bool(nav.get("allowCombinedLocales")),
+    }
+
+
+def _sidebar_items(text):
+    """解析 sidebar：返回 [(indent, text, target)]；target 为 None 表示纯分类标题。"""
+    items = []
+    for line in text.splitlines():
+        m = re.match(r"^(\s*)-\s+(.*)$", line)
+        if not m:
+            continue
+        indent = len(m.group(1)) // 2
+        label = m.group(2)
+        lm = re.match(r"^(.*)\(([^)]+)\)\s*$", label)
+        if lm and not lm.group(2).startswith(("http://", "https://", "mailto:")):
+            items.append((indent, lm.group(1).strip(), lm.group(2).strip()))
+        else:
+            items.append((indent, label, None))
+    return items
+
+
+def _navcheck_sidebar(name, path, is_en, cfg, issues):
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    items = _sidebar_items(text)
+    seen = {}
+    # 分类密度：统计每个顶级分类下的直接子页面数
+    roots = []  # [(index_of_category, [child_targets])]
+    current = None
+    for indent, label, target in items:
+        if target is None and indent == 0:
+            current = (label, [])
+            roots.append(current)
+        elif current is not None and indent >= 1 and target is not None:
+            current[1].append((indent, target))
+        elif target is not None:
+            current = None  # 顶级裸链接页，不算分类
+
+    for indent, label, target in items:
+        if target is None:
+            continue
+        t = target.split("#")[0].rstrip("/") or "/"
+        if t in seen:
+            issues.append((name, "DUPLICATE_LINK", f"`{target}` 与 `{seen[t]}` 重复", "error"))
+        else:
+            seen[t] = target
+        if "#" in target and not cfg["allowSidebarAnchors"]:
+            issues.append((name, "ANCHOR_LINK", f"`{target}` —— 侧边栏不做页内目录", "error"))
+        if not target.startswith(("/", "http://", "https://", "mailto:")):
+            issues.append((name, "NOT_ROOT_ABSOLUTE", f"`{target}` 非根绝对路径", "warning"))
+        if is_en and not target.startswith("/en/") and not target.startswith(("http", "mailto")):
+            if not re.search(r"中文|Chinese", label):
+                issues.append((name, "EN_SIDEBAR_ZH_LINK",
+                               f"`{label}` 指向非 /en/ 页面且未标注（中文）", "warning"))
+    if not is_en and not cfg["allowCombinedLocales"]:
+        for indent, label, target in items:
+            if target and target.startswith("/en/"):
+                issues.append((name, "COMBINED_LOCALES",
+                               f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md", "error"))
+                break
+    for label, children in roots:
+        pages = [t for _, t in children]
+        if len(pages) == 1:
+            issues.append((name, "SINGLE_PAGE_CATEGORY",
+                           f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
+
+
+def cmd_navcheck(args):
+    """校验导航信息架构规约（确定性规则；主观的「分类好不好」不在检查范围）。
+
+    error（返回非零）：
+      COMBINED_LOCALES   根 sidebar 出现 /en/ 文档树（语言是站点维度，不是导航分类）
+      EN_SIDEBAR_MISSING 有 docs/en/ 页面但缺 docs/en/_sidebar.md
+      ANCHOR_LINK        sidebar 出现页内锚点（首页目录混入导航；可用
+                         .docsite.json navigation.allowSidebarAnchors 显式豁免）
+      DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
+    warning（仅提示，不影响退出码）：
+      SINGLE_PAGE_CATEGORY 顶级分类只有 1 个页面
+      NOT_ROOT_ABSOLUTE   本地链接未用根绝对路径
+      EN_SIDEBAR_ZH_LINK  英文 sidebar 指向中文页面且未标注（中文）
+    例外必须写入仓库 .docsite.json 的 navigation 字段，检查器不静默忽略。
+    """
+    if args.all:
+        base = Path(args.all)
+        if not base.is_dir():
+            sys.exit(f"{base} 不是目录")
+        roots = sorted(p for p in base.iterdir() if (p / ".git").is_dir())
+    else:
+        roots = [Path(p) for p in (args.paths or ["."])]
+
+    any_error = False
+    checked = 0
+    for root in roots:
+        zh = root / "docs/_sidebar.md"
+        if not zh.is_file():
+            zh = root / ".github/pages/_sidebar.md"
+        if not zh.is_file():
+            continue  # 无导航的仓库（如 docsite 自身）不参与
+        checked += 1
+        cfg = _nav_config(root)
+        issues = []
+        _navcheck_sidebar(root.name, zh, is_en=False, cfg=cfg, issues=issues)
+        en = root / "docs/en/_sidebar.md"
+        en_pages = [p for p in (root / "docs/en").glob("*.md")] if (root / "docs/en").is_dir() else []
+        if en_pages and not en.is_file():
+            issues.append((f"{root.name}/en", "EN_SIDEBAR_MISSING",
+                           "docs/en/ 有页面但没有 docs/en/_sidebar.md", "error"))
+        elif en.is_file():
+            _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues)
+
+        if not issues:
+            print(f"✅ {root.name}")
+            continue
+        errors = [i for i in issues if i[3] == "error"]
+        warns = [i for i in issues if i[3] == "warning"]
+        for name, rule, note, level in issues:
+            mark = "❌" if level == "error" else "⚠️ "
+            print(f"{mark} {name:<22} {rule:<20} {note}")
+        if errors:
+            any_error = True
+
+    print(f"\n{checked} 个仓库参与导航检查；error 以 ❌ 标出，warning 仅提示。")
+    if any_error:
+        print("修复参考：docsite README「导航与信息架构」；显式例外写入 .docsite.json 的 navigation 字段。")
+        return 1
+    return 0
+
+
 def main():
     if not TEMPLATE.exists():
         sys.exit(f"找不到模板目录 {TEMPLATE}")
@@ -282,6 +430,11 @@ def main():
     c.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
     c.add_argument("--all", help="扫描该目录下所有 git 仓库")
     c.set_defaults(func=cmd_check)
+
+    n = sub.add_parser("navcheck", help="校验导航信息架构规约（确定性规则）")
+    n.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
+    n.add_argument("--all", help="扫描该目录下所有 git 仓库")
+    n.set_defaults(func=cmd_navcheck)
 
     args = p.parse_args()
     sys.exit(args.func(args) or 0)

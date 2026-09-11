@@ -52,8 +52,12 @@
       nameLink: '#/',
       repo: '@@REPO@@',
       loadSidebar: true,
-      // 子目录页面（如 zh-CN/）也统一用根侧边栏；链接用根绝对路径（/FOO.md）
-      alias: { '/.*/_sidebar.md': '/_sidebar.md' },
+      // 语言是站点维度：/en/ 页面读 /en/_sidebar.md，根页面读 /_sidebar.md。
+      // en 规则必须排在通配规则前面（docsify 按顺序取第一个命中的 alias）。
+      alias: {
+        '/en/.*/_sidebar.md': '/en/_sidebar.md',
+        '/.*/_sidebar.md': '/_sidebar.md'
+      },
       subMaxLevel: 2,
       maxLevel: 3,
       auto2top: true,
