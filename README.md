@@ -10,7 +10,7 @@
 - **只管壳子**：`index.html` / 部署 workflow / docsify 资源由模板托管；Markdown 是你自己的，升级永不覆盖内容
 - **自带部署**：生成 GitHub Actions workflow，push `docs/` 即发布到 Pages
 - **开箱即用**：明暗主题切换（跟随系统 + 记忆）、全文搜索、emoji favicon、侧边栏
-- **子目录统一侧边栏**：`zh-CN/`、`en/` 等子目录页面自动共用根侧边栏，不用每个目录再放一份
+- **子目录统一侧边栏**：`en/` 等子目录页面自动共用根侧边栏，不用每个目录再放一份
 
 ## 新项目接入
 
@@ -44,8 +44,13 @@ docs/
 ├── index.html                # docsify 外壳（托管，别手改）
 ├── .nojekyll
 ├── _sidebar.md               # 侧边栏（你的内容）
-├── README.md                 # 首页（你的内容）
-├── QUICKSTART.md             # 示例页（你的内容）
+├── README.md                 # 中文首页（你的内容）
+├── QUICKSTART.md             # 中文示例页（你的内容）
+├── download.md               # 中文下载页（你的内容）
+├── en/                       # 英文镜像（你的内容，与根同名页一一对应）
+│   ├── README.md
+│   ├── QUICKSTART.md
+│   └── download.md
 └── assets/vendor/            # docsify + 主题 + 搜索（托管）
 ```
 
@@ -88,7 +93,62 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
 2. 在 `docs/_sidebar.md` 里加链接（根绝对路径：`- [标题](/PAGE.md)`）
 3. `git commit && git push`——workflow 监听 `docs/**` 变化，一两分钟后线上更新
 
-多语言就建子目录（`docs/zh-CN/`、`docs/en/`），根侧边栏统一列链接；正文内部互链用普通相对路径（如 `[English](../)`）。
+具体命名与目录规范见下节。
+
+## 统一文档规范（本账号约定）
+
+`docsite` 生成的结构默认遵循以下规范，本账号下所有仓库的文档都以它为准，避免各写各的。
+
+### 语言与文件命名
+
+| 位置 | 中文（默认） | 英文 |
+| :-- | :-- | :-- |
+| 仓库根 README | `README.md` | `README.en.md` |
+| 文档站首页 | `docs/README.md` | `docs/en/README.md` |
+| 文档站正文 | `docs/<PAGE>.md` | `docs/en/<PAGE>.md` |
+| 下载页 | `docs/download.md` | `docs/en/download.md` |
+
+- **中文是默认语言**：`README.md`、`docs/README.md` 一律写中文
+- **英文统一用 `.en.md` 点号后缀**，禁止 `README_EN.md`、`README_CN.md`、`README.zh-CN.md`
+- 文档站内禁止再用 `*.zh-CN.md` / `*.en.md` 后缀或 `docs/zh-CN/` 目录：中英分别由 `docs/` 与 `docs/en/` 两个平行目录承载，同名页一一对应
+- README 顶部加语言切换行（根 README 指向 `README.en.md`）：
+
+  ```markdown
+  **语言 / Language:** 中文 · [English](README.en.md)
+  ```
+
+### 侧边栏
+
+`docs/_sidebar.md` 固定两个分组，全部使用**根绝对路径**：
+
+```markdown
+- 中文
+  - [文档中心](/)
+  - [快速开始](/QUICKSTART.md)
+  - [📥 下载](/download.md)
+- English
+  - [Documentation](/en/)
+  - [Quick Start](/en/QUICKSTART.md)
+  - [📥 Download](/en/download.md)
+```
+
+中文页必须全部可导航；英文页未逐条列出时，至少保留 `Documentation`（`/en/`）入口。
+
+### 下载页
+
+每个仓库都要有 `docs/download.md`（中文）与 `docs/en/download.md`（英文）：
+
+- 有二进制产物：按平台列表格，链接用 `releases/latest/download/<asset>`，并列出 `SHA256SUMS`
+- 只有包管理器产物（npm / PyPI / Cloudflare Worker）：不编造二进制链接，改列安装命令与注册表入口
+- 页面顶部给 Releases 与 CHANGELOG 链接
+
+### 部署 workflow
+
+`docsite init` 生成 `.github/workflows/docs.yml`。早期接入的仓库沿用了 GitHub 默认模板名 `static.yml`——**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。只需保证：
+
+- 只保留**一个** Pages 部署 workflow，避免重复部署
+- 触发分支与 `.docsite.json` 的 `branch` 一致
+- 若 workflow 采用「拼接 `_site`」模式（拷贝根级 `*.md` 而非上传 `./docs`），新增的 `docs/en/` 页面需确认已被纳入拷贝范围
 
 ## 升级 docsite 模板
 
@@ -113,5 +173,6 @@ python3 /tmp/docsite/docsite.py update
 
 ## 非目标
 
-- 不做多版本/多语言路由、不做服务端搜索、不做自定义主题系统
+- 不做按语言自动跳转的多语言路由（英文由 `docs/en/` 目录承载，由侧边栏手动导航）
+- 不做服务端搜索、不做自定义主题系统
 - 不内置"一键批量升级所有仓库"——每个仓库自己跑一次 update，diff 可见可控

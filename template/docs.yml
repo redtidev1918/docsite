@@ -1,5 +1,6 @@
 # docsite: managed file, run `python3 docsite.py update` to refresh.
 # 使用 GitHub 推荐的静态 HTML 部署方式（docsify，无需构建）
+# 注意：早期接入的仓库沿用了 GitHub 默认模板名 static.yml；内容等价，无需改名。
 
 name: Deploy static content to Pages
 

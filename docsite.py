@@ -7,6 +7,7 @@
 init   在当前仓库生成 docs/ 与 Pages 部署 workflow。
 update 只刷新托管文件（index.html / workflow / vendor），永远不动你写的 Markdown。
 
+统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/。
 配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
 """
 import argparse
@@ -19,8 +20,10 @@ from pathlib import Path
 TEMPLATE = Path(__file__).resolve().parent / "template"
 CONFIG = Path(".docsite.json")
 
-# init 时创建、但 update 永不覆盖的内容文件
-CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md"]
+# init 时创建、但 update 永不覆盖的内容文件（docs/ 根 = 中文）
+CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
+# 英文镜像内容（docs/en/ 下同名文件）
+EN_CONTENT_FILES = ["README.md", "QUICKSTART.md", "download.md"]
 # init/update 都由模板渲染的托管文件
 MANAGED = {
     "index.html": "docs/index.html",
@@ -80,11 +83,20 @@ def cmd_init(args):
 
     write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
 
-    # 内容骨架：只在缺失时创建
+    # 内容骨架：只在缺失时创建（docs/ 根 = 中文）
     for name_ in CONTENT_FILES:
         text = render((TEMPLATE / name_).read_text(encoding="utf-8"), cfg)
         if write_file(Path("docs") / name_, text, overwrite=False):
             print(f"  + docs/{name_}")
+
+    # 英文镜像：docs/en/
+    for name_ in EN_CONTENT_FILES:
+        src = TEMPLATE / "en" / name_
+        if not src.exists():
+            continue
+        text = render(src.read_text(encoding="utf-8"), cfg)
+        if write_file(Path("docs") / "en" / name_, text, overwrite=False):
+            print(f"  + docs/en/{name_}")
 
     # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
     for tpl, dst in MANAGED.items():
