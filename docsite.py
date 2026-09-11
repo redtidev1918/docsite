@@ -3,10 +3,14 @@
 
     python3 docsite.py init --repo owner/name [--name 名] [--emoji 📘] [--branch main]
     python3 docsite.py update
+    python3 docsite.py check [仓库路径 ...] [--all 父目录]
 
 init   在当前仓库生成 docs/ 与 Pages 部署 workflow。
-update 只刷新托管文件（index.html / workflow / vendor），永远不动你写的 Markdown。
+update 只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
+       永远不动你写的 Markdown。
+check  校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
 
+统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/。
 配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
 """
 import argparse
@@ -19,12 +23,21 @@ from pathlib import Path
 TEMPLATE = Path(__file__).resolve().parent / "template"
 CONFIG = Path(".docsite.json")
 
-# init 时创建、但 update 永不覆盖的内容文件
-CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md"]
+# init 时创建、但 update 永不覆盖的内容文件（docs/ 根 = 中文）
+CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
+# 英文镜像内容（docs/en/ 下同名文件）
+EN_CONTENT_FILES = ["README.md", "QUICKSTART.md", "download.md"]
+# 托管且要求「跨仓库逐字节一致」的文件（下载页生成链路）。
+# 不含模板 token，因此可直接比对；docsite.py check 用它做一致性校验。
+SYNCED = {
+    "download-page.py": ".github/scripts/update_download_page.py",
+    "update-download-page.yml": ".github/workflows/update-download-page.yml",
+}
 # init/update 都由模板渲染的托管文件
 MANAGED = {
     "index.html": "docs/index.html",
     "docs.yml": ".github/workflows/docs.yml",
+    **SYNCED,
 }
 VENDOR_DIR = Path("docs/assets/vendor")
 
@@ -46,12 +59,36 @@ def render(text, cfg):
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
 
 
+def is_managed(path):
+    """判断已有文件是否为 docsite 下发（两种标记：外壳用注释串，脚本用 marker 行）。"""
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    return "docsite: managed file" in text[:400] or "docsite-managed-file:" in text
+
+
 def write_file(path, text, overwrite):
     if path.exists() and not overwrite:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return True
+
+
+def other_pages_workflow(dst):
+    """返回同一目录下另一个 Pages 部署 workflow 的文件名（没有则 None）。
+
+    历史仓库沿用了 GitHub 默认模板名 static.yml。此时不再写入托管的 docs.yml，
+    否则同一个仓库会出现两个 Pages 部署工作流，互相覆盖。
+    """
+    wf_dir = dst.parent
+    if not wf_dir.is_dir():
+        return None
+    for f in sorted(wf_dir.glob("*.y*ml")):
+        if f.name == dst.name:
+            continue
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        if "upload-pages-artifact" in text or "deploy-pages" in text:
+            return f.name
+    return None
 
 
 def copy_vendor(overwrite):
@@ -80,16 +117,30 @@ def cmd_init(args):
 
     write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
 
-    # 内容骨架：只在缺失时创建
+    # 内容骨架：只在缺失时创建（docs/ 根 = 中文）
     for name_ in CONTENT_FILES:
         text = render((TEMPLATE / name_).read_text(encoding="utf-8"), cfg)
         if write_file(Path("docs") / name_, text, overwrite=False):
             print(f"  + docs/{name_}")
 
+    # 英文镜像：docs/en/
+    for name_ in EN_CONTENT_FILES:
+        src = TEMPLATE / "en" / name_
+        if not src.exists():
+            continue
+        text = render(src.read_text(encoding="utf-8"), cfg)
+        if write_file(Path("docs") / "en" / name_, text, overwrite=False):
+            print(f"  + docs/en/{name_}")
+
     # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
     for tpl, dst in MANAGED.items():
         d = Path(dst)
-        if d.exists() and "docsite: managed file" not in d.read_text(encoding="utf-8", errors="ignore")[:400]:
+        if d.name == "docs.yml":
+            other = other_pages_workflow(d)
+            if other:
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                continue
+        if d.exists() and not is_managed(d):
             bak = Path(str(d) + ".docsite.bak")
             shutil.copy2(d, bak)
             print(f"  ! {dst} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
@@ -127,14 +178,81 @@ def cmd_update(_args):
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
 
     for tpl, dst in MANAGED.items():
+        d = Path(dst)
+        if d.name == "docs.yml":
+            other = other_pages_workflow(d)
+            if other:
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                continue
         text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
-        write_file(Path(dst), text, overwrite=True)
+        write_file(d, text, overwrite=True)
         print(f"  ~ {dst}")
 
     copy_vendor(overwrite=True)
     write_file(Path("docs/.nojekyll"), "", overwrite=True)
     print("  ~ docs/assets/vendor/ 已同步")
     print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
+
+
+def cmd_check(args):
+    """跨仓库校验下载页生成链路是否与模板一致。
+
+    只有这几个文件要求完全相同；index.html 等允许各仓库有差异，故不参与比对。
+    """
+    if args.all:
+        base = Path(args.all)
+        if not base.is_dir():
+            sys.exit(f"{base} 不是目录")
+        roots = sorted(p for p in base.iterdir() if (p / ".git").is_dir())
+    else:
+        roots = [Path(p) for p in (args.paths or ["."])]
+
+    rows = []
+    for root in roots:
+        # 不是文档站（既无 docs/ 也无 .github/pages/）：例如 docsite 脚手架自身。
+        if not (root / "docs").is_dir() and not (root / ".github" / "pages").is_dir():
+            rows.append((root.name, "—", "skipped", "不是文档站"))
+            continue
+        # 未采用托管生成器：下载页为手写，不参与比对（约定允许 npm/PyPI 类仓库手写）。
+        if not any((root / dst).exists() for dst in SYNCED.values()):
+            rows.append((root.name, "—", "n/a", "未使用托管生成器（手写下载页）"))
+            continue
+        for tpl, dst in SYNCED.items():
+            tpl_path = TEMPLATE / tpl
+            if not tpl_path.exists():
+                rows.append((root.name, dst, "TEMPLATE_MISSING", "-"))
+                continue
+            want = tpl_path.read_text(encoding="utf-8").rstrip()
+            target = root / dst
+            if not target.exists():
+                rows.append((root.name, dst, "MISSING", "-"))
+                continue
+            got = target.read_text(encoding="utf-8", errors="ignore")
+            if got.rstrip() == want:
+                rows.append((root.name, dst, "ok", ""))
+            else:
+                note = "被手改或版本落后" if "docsite-managed-file:" in got else "缺少 docsite marker"
+                rows.append((root.name, dst, "DRIFT", note))
+
+    if not rows:
+        print("没有可比对的仓库")
+        return 0
+
+    w1 = max(len(r[0]) for r in rows)
+    w2 = max(len(r[1]) for r in rows)
+    marks = {"ok": "✅", "n/a": "➖", "skipped": "➖"}
+    for name, dst, status, note in rows:
+        mark = marks.get(status, "❌")
+        print(f"{mark} {name:<{w1}}  {dst:<{w2}}  {status:<16} {note}")
+
+    bad = [r for r in rows if r[2] not in ("ok", "n/a", "skipped")]
+    checked = [r for r in rows if r[2] not in ("n/a", "skipped")]
+    print(f"\n{len(checked) - len(bad)}/{len(checked)} 一致"
+          f"（{len(rows) - len(checked)} 项不参与比对）")
+    if bad:
+        print("修复：在对应仓库根运行 `python3 docsite.py update`，检查 diff 后提交。")
+        return 1
+    return 0
 
 
 def main():
@@ -155,8 +273,13 @@ def main():
     u = sub.add_parser("update", help="按最新模板刷新托管文件")
     u.set_defaults(func=cmd_update)
 
+    c = sub.add_parser("check", help="校验下载页生成链路是否与模板一致")
+    c.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
+    c.add_argument("--all", help="扫描该目录下所有 git 仓库")
+    c.set_defaults(func=cmd_check)
+
     args = p.parse_args()
-    args.func(args)
+    sys.exit(args.func(args) or 0)
 
 
 if __name__ == "__main__":
