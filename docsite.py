@@ -286,7 +286,12 @@ def _nav_config(root):
 
 
 def _sidebar_items(text):
-    """解析 sidebar：返回 [(indent, text, target)]；target 为 None 表示纯分类标题。"""
+    """解析 sidebar：返回 [(indent, label, target)]。
+
+    target 仅在条目是真正的 Markdown 链接（含 `](`）时非 None；
+    纯分类标题（如 `- Production (Serverless)`）target 为 None，避免括号误判。
+    外部链接返回其 URL。
+    """
     items = []
     for line in text.splitlines():
         m = re.match(r"^(\s*)-\s+(.*)$", line)
@@ -294,32 +299,36 @@ def _sidebar_items(text):
             continue
         indent = len(m.group(1)) // 2
         label = m.group(2)
-        lm = re.match(r"^(.*)\(([^)]+)\)\s*$", label)
-        if lm and not lm.group(2).startswith(("http://", "https://", "mailto:")):
-            items.append((indent, lm.group(1).strip(), lm.group(2).strip()))
+        lm = re.match(r"^(.*\])\(([^)]+)\)\s*$", label)
+        if lm:
+            items.append((indent, lm.group(1)[1:-1].strip(), lm.group(2).strip()))
         else:
             items.append((indent, label, None))
     return items
+
+
+def _is_external(target):
+    return target.startswith(("http://", "https://", "mailto:"))
 
 
 def _navcheck_sidebar(name, path, is_en, cfg, issues):
     text = path.read_text(encoding="utf-8", errors="ignore")
     items = _sidebar_items(text)
     seen = {}
-    # 分类密度：统计每个顶级分类下的直接子页面数
-    roots = []  # [(index_of_category, [child_targets])]
+    # 分类密度：统计每个顶级分类下的直接子条目（内部页与外部链接都算）
+    roots = []
     current = None
     for indent, label, target in items:
         if target is None and indent == 0:
             current = (label, [])
             roots.append(current)
         elif current is not None and indent >= 1 and target is not None:
-            current[1].append((indent, target))
+            current[1].append(target)
         elif target is not None:
             current = None  # 顶级裸链接页，不算分类
 
     for indent, label, target in items:
-        if target is None:
+        if target is None or _is_external(target):
             continue
         # 锚点被显式允许时（如 CDN 壳的单 README 站点），仅锚点不同的两项是合法的不同导航项
         key = target if cfg["allowSidebarAnchors"] else target.split("#")[0].rstrip("/") or "/"
@@ -329,12 +338,26 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
             seen[key] = target
         if "#" in target and not cfg["allowSidebarAnchors"]:
             issues.append((name, "ANCHOR_LINK", f"`{target}` —— 侧边栏不做页内目录", "error"))
-        if not target.startswith(("/", "http://", "https://", "mailto:")):
+        if not target.startswith("/"):
             issues.append((name, "NOT_ROOT_ABSOLUTE", f"`{target}` 非根绝对路径", "warning"))
-        if is_en and not target.startswith("/en/") and not target.startswith(("http", "mailto")):
+        if is_en and not target.startswith("/en/"):
             if not re.search(r"中文|Chinese", label):
                 issues.append((name, "EN_SIDEBAR_ZH_LINK",
                                f"`{label}` 指向非 /en/ 页面且未标注（中文）", "warning"))
+    if not is_en and not cfg["allowCombinedLocales"]:
+        for indent, label, target in items:
+            # 标注「（英文）」的单条 fallback 链接允许（规则 20 的对称场景：
+            # 页面仅有英文版时，中文侧边栏可显式标注后指向它）；整棵英文树仍然禁止
+            if (target and not _is_external(target) and target.startswith("/en/")
+                    and not re.search(r"英文|English", label)):
+                issues.append((name, "COMBINED_LOCALES",
+                               f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md；"
+                               "确需指向英文页必须在标题中标注（英文）", "error"))
+                break
+    for label, children in roots:
+        if len(children) == 1:
+            issues.append((name, "SINGLE_PAGE_CATEGORY",
+                           f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
     if not is_en and not cfg["allowCombinedLocales"]:
         for indent, label, target in items:
             # 标注「（英文）」的单条 fallback 链接允许（规则 20 的对称场景：
@@ -345,8 +368,7 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
                                "确需指向英文页必须在标题中标注（英文）", "error"))
                 break
     for label, children in roots:
-        pages = [t for _, t in children]
-        if len(pages) == 1:
+        if len(children) == 1:
             issues.append((name, "SINGLE_PAGE_CATEGORY",
                            f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
 
