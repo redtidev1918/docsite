@@ -1,8 +1,4 @@
-- 中文
-  - [文档中心](/)
-  - [快速开始](/QUICKSTART.md)
+- 开始
+  - [概览](/)
   - [📥 下载](/download.md)
-- English
-  - [Documentation](/en/)
-  - [Quick Start](/en/QUICKSTART.md)
-  - [📥 Download](/en/download.md)
+  - [快速开始](/QUICKSTART.md)

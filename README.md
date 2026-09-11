@@ -238,6 +238,101 @@ python3 docsite.py check .                      # 只查当前仓库
 
 不建议把 `pyproject.toml` 的 `readme` 指向 `README.en.md`：那会让「GitHub 中文、PyPI 英文、npm 中文」，规则反而多了一条。如果日后确实要把 **registry-facing docs = English** 做成账号级规范，应当单独设计 npm 的 publish staging，而不是在每个仓库零散加特例。
 
+## 导航与信息架构
+
+**导航哲学（navigation philosophy）**：
+
+> 导航按用户任务组织，而不是按仓库文件结构组织。
+> 语言是站点维度，不是导航分类。
+> 首页负责介绍和分流；侧边栏负责页面导航；页内目录负责当前页面结构。
+> 三者不要互相复制。
+>
+> Navigation follows user tasks, not repository layout.
+> Locale is a site-level dimension, not a navigation category.
+> Landing pages orient. Sidebars navigate. In-page TOCs structure the current page.
+> Do not duplicate these responsibilities.
+
+核心一句话：**Sidebar is navigation, not a table of contents.**
+（侧边栏用于导航文档页面，不用于复刻当前页面的标题目录。）
+
+### 职责分离
+
+| 层 | 职责 | 不负责 |
+| :-- | :-- | :-- |
+| 首页（`docs/README.md` / `docs/en/README.md`） | 项目是什么、适合谁、主要入口、下载按钮 | 不充当全站目录 |
+| 侧边栏（`docs/_sidebar.md` / `docs/en/_sidebar.md`） | 导航**独立页面** | 不收录首页页内锚点 |
+| 页内目录（`subMaxLevel` 等） | 当前页的标题结构 | 不替代分类导航 |
+
+README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边栏要同步出现——
+只有当它成为独立文档页面时才考虑加入。
+
+### 可检查的 invariant（`docsite.py navcheck`）
+
+| # | 规则 | 级别 |
+| :-- | :-- | :-- |
+| 1 | 根 sidebar 不包含 `/en/` 文档树（语言是站点维度） | error `COMBINED_LOCALES` |
+| 2 | `docs/en/` 有页面时，`docs/en/_sidebar.md` 必须存在 | error `EN_SIDEBAR_MISSING` |
+| 3 | sidebar 不含页内锚点（`#` 链接） | error `ANCHOR_LINK` |
+| 4 | 同一目标在同一 sidebar 不得重复 | error `DUPLICATE_LINK` |
+| 5 | 顶级分类通常至少 2 个页面 | warning `SINGLE_PAGE_CATEGORY` |
+| 6 | 本地链接用根绝对路径 | warning `NOT_ROOT_ABSOLUTE` |
+| 7 | 英文 sidebar 指向中文页面必须标注（中文） | warning `EN_SIDEBAR_ZH_LINK` |
+
+error 影响退出码；warning 只提示（比如项目正在扩展分类，单页面分类是过渡状态）。
+「分类名字好不好」这类主观判断**不**自动检查。
+
+### 默认信息架构
+
+中小型项目（少于约 8~10 个独立页面）用 2~4 个分类，常用页面 1 次点击可达，最多 2 层：
+
+```text
+开始            概览 / 下载 / 快速开始
+使用与配置      认证、网络、配置、命令行、故障排查……
+开发            架构、API、适配器、构建、发布……
+项目            参与贡献 / 安全 / 合规（仅当存在独立页面时才出现）
+```
+
+- 不要求四组全有，禁止为模板完整创建空壳页面
+- 分类命名用任务型词汇（开始 / 使用与配置 / 开发 / 项目；Getting Started / Usage & Configuration / Development / Project），避免「基础信息」「技术资料」「其他」这类模糊词
+- 页面标题要比分类更具体（`开发 → 架构说明`，不是 `开发 → 开发`）
+- 首页在 sidebar 里叫「概览」（Overview），不叫「文档中心」——用户已经在文档站里
+- 下载只保留一个 sidebar 入口（`开始 → 下载`）；首页可以再有下载按钮，这不算重复
+- sidebar 不是网站地图：CHANGELOG、LICENSE、SECURITY、内部 notes 是否进入取决于是否需要经常导航，文件存在 ≠ 必须出现在 sidebar
+
+### 语言侧边栏与 Docsify
+
+- 每种语言一套 sidebar：`docs/_sidebar.md`（中文）与 `docs/en/_sidebar.md`（英文），各自只显示当前语言
+- 语言切换放在**页面顶部**，子页面优先指向对应翻译页（`/authentication.md ↔ /en/authentication.md`）；无对应翻译时回到该语言首页；不要把语言切换塞进 sidebar 分类树
+- 英文 sidebar 不放「伪英文入口」；确需 fallback 时必须标注（中文）/ Chinese only
+- docsify 外壳的 alias 按 locale 解析（en 规则必须排在通配规则前）：
+
+  ```js
+  alias: {
+    '/en/.*/_sidebar.md': '/en/_sidebar.md',
+    '/.*/_sidebar.md': '/_sidebar.md'
+  }
+  ```
+
+### 显式例外
+
+确需保留页内锚点或单 sidebar 双语的仓库（如 CDN 壳站点、超长单页规范），写入仓库根
+`.docsite.json`，检查器不静默忽略：
+
+```json
+{
+  "navigation": {
+    "allowSidebarAnchors": true,
+    "allowCombinedLocales": true
+  }
+}
+```
+
+### 特殊规范文件
+
+沿用「机器生成 / 合规 / 行业约定文件」例外：`CHANGELOG.md`、`LICENSE`、
+`THIRD_PARTY_NOTICES.md`、`SECURITY.md` 等的 canonical path 不因导航或语言目录规约被
+机械移动；如需导航，直接链接即可。
+
 ## 升级 docsite 模板
 
 模板更新后（换 docsify 版本、改样式、加功能），在每个接入仓库的根目录：
