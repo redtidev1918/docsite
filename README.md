@@ -195,6 +195,34 @@ python3 docsite.py check .                      # 只查当前仓库
 - 触发分支与 `.docsite.json` 的 `branch` 一致
 - 若 workflow 采用「拼接 `_site`」模式（拷贝根级 `*.md` 而非上传 `./docs`），新增的 `docs/en/` 页面需确认已被纳入拷贝范围
 
+已做防护：`init` / `update` 在发现同一目录已有其它 Pages 部署 workflow（如历史 `static.yml`）时，**会跳过托管 `docs.yml`**，不会制造第二个部署流程。
+
+#### Actions 版本的单一事实源
+
+`template/docs.yml` 是**全账号 actions 版本的唯一来源**。当前统一版本：
+
+| Action | 版本 |
+| :-- | :-- |
+| `actions/checkout` | `v7` |
+| `actions/configure-pages` | `v6` |
+| `actions/upload-pages-artifact` | `v5` |
+| `actions/deploy-pages` | `v5` |
+
+升级 Actions 时**只改这一处模板**，再由各仓库运行 `python3 docsite.py update` 收敛。不要在单个仓库里手改：`docs.yml` 是托管文件，下次 `update` 会把改动覆盖回模板版本，于是同一份版本号在仓库间反复漂移。
+
+### 包管理器页面（npm / PyPI）
+
+**不为注册表页面制造例外。** 统一规则只有一条：`README.md` 永远是中文默认，第一屏给出 English 入口。
+
+| 面 | 语言 |
+| :-- | :-- |
+| `README.md` 正文（GitHub / 文档站） | 中文默认 + English 入口 |
+| npm 包页面 | 中文（npm 直接渲染仓库根的 `README.md`，不做重定向） |
+| PyPI 项目页（`pyproject.toml` 的 `readme`） | 继续指向 `README.md` |
+| `description` / `keywords` | 英文（面向检索的元数据，与正文语言不冲突） |
+
+不建议把 `pyproject.toml` 的 `readme` 指向 `README.en.md`：那会让「GitHub 中文、PyPI 英文、npm 中文」，规则反而多了一条。如果日后确实要把 **registry-facing docs = English** 做成账号级规范，应当单独设计 npm 的 publish staging，而不是在每个仓库零散加特例。
+
 ## 升级 docsite 模板
 
 模板更新后（换 docsify 版本、改样式、加功能），在每个接入仓库的根目录：

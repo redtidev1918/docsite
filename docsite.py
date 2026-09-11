@@ -73,6 +73,24 @@ def write_file(path, text, overwrite):
     return True
 
 
+def other_pages_workflow(dst):
+    """返回同一目录下另一个 Pages 部署 workflow 的文件名（没有则 None）。
+
+    历史仓库沿用了 GitHub 默认模板名 static.yml。此时不再写入托管的 docs.yml，
+    否则同一个仓库会出现两个 Pages 部署工作流，互相覆盖。
+    """
+    wf_dir = dst.parent
+    if not wf_dir.is_dir():
+        return None
+    for f in sorted(wf_dir.glob("*.y*ml")):
+        if f.name == dst.name:
+            continue
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        if "upload-pages-artifact" in text or "deploy-pages" in text:
+            return f.name
+    return None
+
+
 def copy_vendor(overwrite):
     src = TEMPLATE / "assets" / "vendor"
     VENDOR_DIR.mkdir(parents=True, exist_ok=True)
@@ -117,6 +135,11 @@ def cmd_init(args):
     # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
     for tpl, dst in MANAGED.items():
         d = Path(dst)
+        if d.name == "docs.yml":
+            other = other_pages_workflow(d)
+            if other:
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                continue
         if d.exists() and not is_managed(d):
             bak = Path(str(d) + ".docsite.bak")
             shutil.copy2(d, bak)
@@ -155,8 +178,14 @@ def cmd_update(_args):
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
 
     for tpl, dst in MANAGED.items():
+        d = Path(dst)
+        if d.name == "docs.yml":
+            other = other_pages_workflow(d)
+            if other:
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                continue
         text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
-        write_file(Path(dst), text, overwrite=True)
+        write_file(d, text, overwrite=True)
         print(f"  ~ {dst}")
 
     copy_vendor(overwrite=True)
