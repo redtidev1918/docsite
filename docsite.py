@@ -198,6 +198,11 @@ def cmd_check(args):
     """跨仓库校验下载页生成链路是否与模板一致。
 
     只有这几个文件要求完全相同；index.html 等允许各仓库有差异，故不参与比对。
+
+    语言命名规范只约束人工维护的 README / docs 内容。机器生成、行业约定或合规类
+    文件（CHANGELOG.md、THIRD_PARTY_NOTICES.md、LICENSE、SECURITY.md 等）允许保留
+    canonical 文件名与原始语言，翻译副本可用 .zh-CN.md / .en.md —— 不视为违规，
+    本检查器也因此不扫描它们（graf 的 CHANGELOG*.md 是有意保留的特例，不是技术债）。
     """
     if args.all:
         base = Path(args.all)
