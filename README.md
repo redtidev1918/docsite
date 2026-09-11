@@ -304,14 +304,14 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
 - 每种语言一套 sidebar：`docs/_sidebar.md`（中文）与 `docs/en/_sidebar.md`（英文），各自只显示当前语言
 - 语言切换放在**页面顶部**，子页面优先指向对应翻译页（`/authentication.md ↔ /en/authentication.md`）；无对应翻译时回到该语言首页；不要把语言切换塞进 sidebar 分类树
 - 英文 sidebar 不放「伪英文入口」；确需 fallback 时必须标注（中文）/ Chinese only
-- docsify 外壳的 alias 按 locale 解析（en 规则必须排在通配规则前）：
+- docsify **原生按页面所在目录取 `_sidebar.md`**：根页面读 `/_sidebar.md`，`/en/` 页面读
+  `/en/_sidebar.md`——两种侧边栏都存在时**不需要 alias**。实测注意两个坑：
 
-  ```js
-  alias: {
-    '/en/.*/_sidebar.md': '/en/_sidebar.md',
-    '/.*/_sidebar.md': '/_sidebar.md'
-  }
-  ```
+  - 不要配置 `/.*/_sidebar.md` 之类的通配 alias「统一侧边栏」：docsify 是先对 sidebar
+    请求路径（`/en/_sidebar.md`）做 alias 改写再取文件，通配规则会把英文页面静默改写回
+    中文侧边栏（且 `/en/.*/_sidebar.md` 这类模式匹配不到 `/en/_sidebar.md` 本身，救不回来）
+  - 外壳不要配置 `subMaxLevel` / `maxLevel`：它们会把**当前页面的标题**动态注入 sidebar
+    渲染，等于把页内目录塞回导航里。需要页内目录时，在页面正文中自建 TOC 段落
 
 ### 显式例外
 

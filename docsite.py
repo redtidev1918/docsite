@@ -356,10 +356,13 @@ def cmd_navcheck(args):
       ANCHOR_LINK        sidebar 出现页内锚点（首页目录混入导航；可用
                          .docsite.json navigation.allowSidebarAnchors 显式豁免）
       DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
+      GLOBAL_SIDEBAR_ALIAS  index.html 用 '/.*/_sidebar.md' 通配 alias 强制根侧边栏
+                         （破坏分语言导航，docsify 原生按目录解析即可，无需 alias）
     warning（仅提示，不影响退出码）：
       SINGLE_PAGE_CATEGORY 顶级分类只有 1 个页面
       NOT_ROOT_ABSOLUTE   本地链接未用根绝对路径
       EN_SIDEBAR_ZH_LINK  英文 sidebar 指向中文页面且未标注（中文）
+      HEADING_INJECTION   index.html 配置 subMaxLevel，页内标题被注入 sidebar 渲染
     例外必须写入仓库 .docsite.json 的 navigation 字段，检查器不静默忽略。
     """
     if args.all:
@@ -389,6 +392,19 @@ def cmd_navcheck(args):
                            "docs/en/ 有页面但没有 docs/en/_sidebar.md", "error"))
         elif en.is_file():
             _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues)
+
+        # 明显旧结构：外壳配置检查（确定性）
+        shell = root / "docs/index.html"
+        if shell.is_file():
+            stext = shell.read_text(encoding="utf-8", errors="ignore")
+            # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
+            if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
+                issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
+                               "index.html 配置了 '/.*/_sidebar.md' 通配 alias，会把 /en/ 页面"
+                               "静默改写回根侧边栏，破坏分语言导航", "error"))
+            if re.search(r"subMaxLevel\s*:", stext):
+                issues.append((root.name, "HEADING_INJECTION",
+                               "index.html 配置了 subMaxLevel，当前页标题会被注入 sidebar 渲染", "warning"))
 
         if not issues:
             print(f"✅ {root.name}")
