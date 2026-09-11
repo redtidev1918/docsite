@@ -1,0 +1,44 @@
+# docsite: 管理文件，由 docsite 模板维护。
+# 导航契约 CI gate：对全账号受管仓库运行 docsite.py navcheck --all。
+# 全绿 = 所有受管仓库满足 canonical 导航结构约束；结构性例外必须由
+# 仓库通过 .docsite.json 显式声明（见 README「导航与信息架构」）。
+
+name: Navigation contract check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # 每周一 03:00 UTC
+  push:
+    branches:
+      - main
+    paths:
+      - 'docsite.py'
+      - 'template/**'
+      - '.github/workflows/navcheck.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "navcheck"
+  cancel-in-progress: false
+
+jobs:
+  navcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docsite
+        uses: actions/checkout@v7
+
+      - name: Clone managed repositories
+        run: |
+          mkdir -p repos
+          for r in PixivFlow pixiv-token-getter pixivflow-telepost-deploy TelePost \
+                   dakit telepress pixivflow-webui paranote ludum graf \
+                   deviantdrop deviantart-downloader daviewer NekoTime releasegraph; do
+            git clone --quiet --depth 1 "https://github.com/redtidev1918/$r" "repos/$r"
+          done
+
+      - name: Run navcheck
+        run: python3 docsite.py navcheck --all repos
