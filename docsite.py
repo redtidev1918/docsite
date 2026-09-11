@@ -321,11 +321,12 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
     for indent, label, target in items:
         if target is None:
             continue
-        t = target.split("#")[0].rstrip("/") or "/"
-        if t in seen:
-            issues.append((name, "DUPLICATE_LINK", f"`{target}` 与 `{seen[t]}` 重复", "error"))
+        # 锚点被显式允许时（如 CDN 壳的单 README 站点），仅锚点不同的两项是合法的不同导航项
+        key = target if cfg["allowSidebarAnchors"] else target.split("#")[0].rstrip("/") or "/"
+        if key in seen:
+            issues.append((name, "DUPLICATE_LINK", f"`{target}` 与 `{seen[key]}` 重复", "error"))
         else:
-            seen[t] = target
+            seen[key] = target
         if "#" in target and not cfg["allowSidebarAnchors"]:
             issues.append((name, "ANCHOR_LINK", f"`{target}` —— 侧边栏不做页内目录", "error"))
         if not target.startswith(("/", "http://", "https://", "mailto:")):
@@ -336,9 +337,12 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
                                f"`{label}` 指向非 /en/ 页面且未标注（中文）", "warning"))
     if not is_en and not cfg["allowCombinedLocales"]:
         for indent, label, target in items:
-            if target and target.startswith("/en/"):
+            # 标注「（英文）」的单条 fallback 链接允许（规则 20 的对称场景：
+            # 页面仅有英文版时，中文侧边栏可显式标注后指向它）；整棵英文树仍然禁止
+            if target and target.startswith("/en/") and not re.search(r"英文|English", label):
                 issues.append((name, "COMBINED_LOCALES",
-                               f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md", "error"))
+                               f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md；"
+                               "确需指向英文页必须在标题中标注（英文）", "error"))
                 break
     for label, children in roots:
         pages = [t for _, t in children]

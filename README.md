@@ -270,7 +270,7 @@ README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边
 
 | # | 规则 | 级别 |
 | :-- | :-- | :-- |
-| 1 | 根 sidebar 不包含 `/en/` 文档树（语言是站点维度） | error `COMBINED_LOCALES` |
+| 1 | 根 sidebar 不包含 `/en/` 文档树（语言是站点维度）；指向仅有英文版的页面时，标注「（英文）」的单条 fallback 链接允许 | error `COMBINED_LOCALES` |
 | 2 | `docs/en/` 有页面时，`docs/en/_sidebar.md` 必须存在 | error `EN_SIDEBAR_MISSING` |
 | 3 | sidebar 不含页内锚点（`#` 链接） | error `ANCHOR_LINK` |
 | 4 | 同一目标在同一 sidebar 不得重复 | error `DUPLICATE_LINK` |
