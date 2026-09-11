@@ -119,6 +119,21 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
   **语言 / Language:** 中文 · [English](README.en.md)
   ```
 
+### 明确例外：机器生成 / 合规 / 行业约定文件
+
+以上命名规范只约束 **README 与人工维护的 docs 内容**。机器生成、行业约定或合规类文件
+（如 `CHANGELOG.md`、`THIRD_PARTY_NOTICES.md`、`LICENSE`，以及 `SECURITY.md` 等受工具链
+约束的文件）**允许保留 canonical 文件名和原始语言**；翻译副本可使用 `.zh-CN.md` /
+`.en.md`。**不得为了命名统一破坏生成器、包管理器或合规工具链。**
+
+- 现存特例：`graf` 的 `CHANGELOG.md` 由 release-please 自动维护（英文、标准文件名），
+  `CHANGELOG.zh-CN.md` 是中文翻译副本；`THIRD_PARTY_NOTICES.md` /
+  `THIRD_PARTY_NOTICES.zh-CN.md` 同理。**这是有意保留的特例，不是技术债**
+  ——强行把中文设为主文件会让 release-please 的自动变更日志反向破坏发布自动化，
+  任何「清理」这类文件的 PR 都应拒绝。
+- 判定口径：若一个文件的「正确文件名」由某个工具（release-please、许可证扫描器、
+  GitHub 内置功能）按字面约定读取，它就属于本例外；只有纯给人看的页面才受命名规范约束。
+
 ### 侧边栏
 
 `docs/_sidebar.md` 固定两个分组，全部使用**根绝对路径**：
