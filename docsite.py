@@ -3,9 +3,12 @@
 
     python3 docsite.py init --repo owner/name [--name 名] [--emoji 📘] [--branch main]
     python3 docsite.py update
+    python3 docsite.py check [仓库路径 ...] [--all 父目录]
 
 init   在当前仓库生成 docs/ 与 Pages 部署 workflow。
-update 只刷新托管文件（index.html / workflow / vendor），永远不动你写的 Markdown。
+update 只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
+       永远不动你写的 Markdown。
+check  校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
 
 统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/。
 配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
@@ -24,10 +27,17 @@ CONFIG = Path(".docsite.json")
 CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
 # 英文镜像内容（docs/en/ 下同名文件）
 EN_CONTENT_FILES = ["README.md", "QUICKSTART.md", "download.md"]
+# 托管且要求「跨仓库逐字节一致」的文件（下载页生成链路）。
+# 不含模板 token，因此可直接比对；docsite.py check 用它做一致性校验。
+SYNCED = {
+    "download-page.py": ".github/scripts/update_download_page.py",
+    "update-download-page.yml": ".github/workflows/update-download-page.yml",
+}
 # init/update 都由模板渲染的托管文件
 MANAGED = {
     "index.html": "docs/index.html",
     "docs.yml": ".github/workflows/docs.yml",
+    **SYNCED,
 }
 VENDOR_DIR = Path("docs/assets/vendor")
 
@@ -47,6 +57,12 @@ def render(text, cfg):
     def sub(m):
         return tokens[m.group(1)]
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
+
+
+def is_managed(path):
+    """判断已有文件是否为 docsite 下发（两种标记：外壳用注释串，脚本用 marker 行）。"""
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    return "docsite: managed file" in text[:400] or "docsite-managed-file:" in text
 
 
 def write_file(path, text, overwrite):
@@ -101,7 +117,7 @@ def cmd_init(args):
     # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
     for tpl, dst in MANAGED.items():
         d = Path(dst)
-        if d.exists() and "docsite: managed file" not in d.read_text(encoding="utf-8", errors="ignore")[:400]:
+        if d.exists() and not is_managed(d):
             bak = Path(str(d) + ".docsite.bak")
             shutil.copy2(d, bak)
             print(f"  ! {dst} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
@@ -149,6 +165,56 @@ def cmd_update(_args):
     print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
 
 
+def cmd_check(args):
+    """跨仓库校验下载页生成链路是否与模板一致。
+
+    只有这几个文件要求完全相同；index.html 等允许各仓库有差异，故不参与比对。
+    """
+    if args.all:
+        base = Path(args.all)
+        if not base.is_dir():
+            sys.exit(f"{base} 不是目录")
+        roots = sorted(p for p in base.iterdir() if (p / ".git").is_dir())
+    else:
+        roots = [Path(p) for p in (args.paths or ["."])]
+
+    rows = []
+    for root in roots:
+        for tpl, dst in SYNCED.items():
+            tpl_path = TEMPLATE / tpl
+            if not tpl_path.exists():
+                rows.append((root.name, dst, "TEMPLATE_MISSING", "-"))
+                continue
+            want = tpl_path.read_text(encoding="utf-8").rstrip()
+            target = root / dst
+            if not target.exists():
+                rows.append((root.name, dst, "MISSING", "-"))
+                continue
+            got = target.read_text(encoding="utf-8", errors="ignore")
+            if got.rstrip() == want:
+                rows.append((root.name, dst, "ok", ""))
+            else:
+                note = "被手改或版本落后" if "docsite-managed-file:" in got else "缺少 docsite marker"
+                rows.append((root.name, dst, "DRIFT", note))
+
+    if not rows:
+        print("没有可比对的仓库")
+        return 0
+
+    w1 = max(len(r[0]) for r in rows)
+    w2 = max(len(r[1]) for r in rows)
+    for name, dst, status, note in rows:
+        mark = "✅" if status == "ok" else "❌"
+        print(f"{mark} {name:<{w1}}  {dst:<{w2}}  {status:<16} {note}")
+
+    bad = [r for r in rows if r[2] != "ok"]
+    print(f"\n{len(rows) - len(bad)}/{len(rows)} 一致")
+    if bad:
+        print("修复：在对应仓库根运行 `python3 docsite.py update`，检查 diff 后提交。")
+        return 1
+    return 0
+
+
 def main():
     if not TEMPLATE.exists():
         sys.exit(f"找不到模板目录 {TEMPLATE}")
@@ -167,8 +233,13 @@ def main():
     u = sub.add_parser("update", help="按最新模板刷新托管文件")
     u.set_defaults(func=cmd_update)
 
+    c = sub.add_parser("check", help="校验下载页生成链路是否与模板一致")
+    c.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
+    c.add_argument("--all", help="扫描该目录下所有 git 仓库")
+    c.set_defaults(func=cmd_check)
+
     args = p.parse_args()
-    args.func(args)
+    sys.exit(args.func(args) or 0)
 
 
 if __name__ == "__main__":

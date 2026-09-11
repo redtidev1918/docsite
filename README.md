@@ -40,6 +40,8 @@ python3 /tmp/docsite/docsite.py init \
 ```
 .docsite.json                 # 本项目的配置（提交进仓库）
 .github/workflows/docs.yml    # Pages 部署（托管，别手改）
+.github/scripts/update_download_page.py    # 下载页生成器（托管，别手改）
+.github/workflows/update-download-page.yml # 发版后刷新下载页（托管，别手改）
 docs/
 ├── index.html                # docsify 外壳（托管，别手改）
 ├── .nojekyll
@@ -141,6 +143,47 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
 - 有二进制产物：按平台列表格，链接用 `releases/latest/download/<asset>`，并列出 `SHA256SUMS`
 - 只有包管理器产物（npm / PyPI / Cloudflare Worker）：不编造二进制链接，改列安装命令与注册表入口
 - 页面顶部给 Releases 与 CHANGELOG 链接
+
+### 下载页生成链路（托管）
+
+下载页由 `docsite` 统一下发，**不要各仓库自己写、也不要手改**：
+
+| 文件 | 作用 |
+| :-- | :-- |
+| `.github/scripts/update_download_page.py` | 生成 `docs/download.md`（中）与 `docs/en/download.md`（英），两页共用同一份资产表 |
+| `.github/workflows/update-download-page.yml` | 在 `release: published` 时调用上面的脚本，无变化不提交 |
+
+两个文件都带 marker，便于机器识别与批量校验：
+
+```
+# docsite-managed-file: update_download_page.py
+# docsite-managed-version: 1
+```
+
+**为什么要托管**：此前 6 个仓库各存一份**手改副本**——行数 146–149、md5 全不相同，而且**没有任何 workflow 真正调用它**。结果是下载页上「本页由 GitHub Actions 在每次发版时自动更新」是假的，页面长期停在旧版本（例：仓库已发 v1.12.0，页面还写着 v1.11.0）。托管后只需维护一份，`update` 统一下发。
+
+按仓库自定义（**非托管**文件，`update` 不会覆盖）：
+
+```json
+{
+  "displayName": "DAViewer",
+  "previewFile": "docs/download-preview.md"
+}
+```
+
+路径固定为 `.github/scripts/download-page.json`：
+
+- `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
+- `previewFile`：手写预览片段，存在时注入中文页（放应用截图等）
+
+**批量校验一致性**（确认没有仓库掉队）：
+
+```bash
+python3 docsite.py check --all /path/to/repos   # 扫描该目录下所有 git 仓库
+python3 docsite.py check .                      # 只查当前仓库
+```
+
+逐文件输出 `ok` / `MISSING` / `DRIFT`；有偏差时到对应仓库跑 `python3 docsite.py update`，看 diff 后提交即可。
 
 ### 部署 workflow
 
