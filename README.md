@@ -167,7 +167,8 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
 ```json
 {
   "displayName": "DAViewer",
-  "previewFile": "docs/download-preview.md"
+  "previewFile": "docs/download-preview.md",
+  "linkBase": ""
 }
 ```
 
@@ -175,6 +176,7 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
 
 - `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
 - `previewFile`：手写预览片段，存在时注入中文页（放应用截图等）
+- `linkBase`：页面内互链的站点路径前缀。默认 `""`（Pages 直接上传 `./docs`，`docs/` 就是站点根）；若仓库用「拼接 `_site`」模式并把 `docs/` 作为子目录发布，填 `"/docs"`，否则两语言互链会 404
 
 **批量校验一致性**（确认没有仓库掉队）：
 

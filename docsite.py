@@ -180,6 +180,14 @@ def cmd_check(args):
 
     rows = []
     for root in roots:
+        # 不是文档站（既无 docs/ 也无 .github/pages/）：例如 docsite 脚手架自身。
+        if not (root / "docs").is_dir() and not (root / ".github" / "pages").is_dir():
+            rows.append((root.name, "—", "skipped", "不是文档站"))
+            continue
+        # 未采用托管生成器：下载页为手写，不参与比对（约定允许 npm/PyPI 类仓库手写）。
+        if not any((root / dst).exists() for dst in SYNCED.values()):
+            rows.append((root.name, "—", "n/a", "未使用托管生成器（手写下载页）"))
+            continue
         for tpl, dst in SYNCED.items():
             tpl_path = TEMPLATE / tpl
             if not tpl_path.exists():
@@ -203,12 +211,15 @@ def cmd_check(args):
 
     w1 = max(len(r[0]) for r in rows)
     w2 = max(len(r[1]) for r in rows)
+    marks = {"ok": "✅", "n/a": "➖", "skipped": "➖"}
     for name, dst, status, note in rows:
-        mark = "✅" if status == "ok" else "❌"
+        mark = marks.get(status, "❌")
         print(f"{mark} {name:<{w1}}  {dst:<{w2}}  {status:<16} {note}")
 
-    bad = [r for r in rows if r[2] != "ok"]
-    print(f"\n{len(rows) - len(bad)}/{len(rows)} 一致")
+    bad = [r for r in rows if r[2] not in ("ok", "n/a", "skipped")]
+    checked = [r for r in rows if r[2] not in ("n/a", "skipped")]
+    print(f"\n{len(checked) - len(bad)}/{len(checked)} 一致"
+          f"（{len(rows) - len(checked)} 项不参与比对）")
     if bad:
         print("修复：在对应仓库根运行 `python3 docsite.py update`，检查 diff 后提交。")
         return 1
