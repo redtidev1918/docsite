@@ -207,8 +207,8 @@ python3 .github/scripts/update_download_page.py owner/project --check        # �
 
 每个生成页带机器可读 marker（`<!-- docsite-release-tag: v1.2.3 -->`），`--check` 据此报告
 `OK / STALE / MISSING / DRIFT`；**stale-write 防护**保证晚到的旧 tag runner 不会把
-已指向新版本的页面回退（`--force` 可显式覆盖）。刷新 workflow 支持
-`workflow_call` / `workflow_dispatch`（`tag` 输入）+ `release: published` 兜底，
+已指向新版本的页面回退（`--force` 可显式覆盖）。刷新 workflow 用
+`workflow_dispatch`（`tag` 输入）+ `release: published` 兜底，
 并在提交成功后显式 dispatch 文档站 workflow（GITHUB_TOKEN 的 push 不会触发 push 型部署）。
 
 **批量校验一致性**（确认没有仓库掉队）：
