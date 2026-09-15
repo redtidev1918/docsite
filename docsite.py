@@ -21,6 +21,7 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -261,7 +262,31 @@ def cmd_check(args):
     if bad:
         print("修复：在对应仓库根运行 `python3 docsite.py update`，检查 diff 后提交。")
         return 1
-    return 0
+
+    # Release-tag 一致性：委托给生成器自己的 --check（OK / STALE / MISSING / DRIFT）。
+    tag_problems = 0
+    for root in roots:
+        gen = root / ".github/scripts/update_download_page.py"
+        if not gen.is_file():
+            continue
+        try:
+            out = subprocess.check_output(
+                ["git", "-C", str(root), "remote", "get-url", "origin"],
+                text=True, stderr=subprocess.DEVNULL)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+        m = re.search(r"(?:github\.com[:/])([^/]+)/([^/.]+)", out)
+        if not m:
+            continue
+        repo = f"{m.group(1)}/{m.group(2)}"
+        print(f"\n{root.name}: 下载页 vs {repo} 最新 stable Release")
+        try:
+            code = subprocess.call([sys.executable, str(gen), repo, "--check"])
+        except FileNotFoundError:
+            code = 1
+        if code != 0:
+            tag_problems = 1
+    return tag_problems
 
 
 NAV_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
