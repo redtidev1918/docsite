@@ -190,8 +190,26 @@ git add -A && git commit -m "docs: 接入 docsite" && git push
 路径固定为 `.github/scripts/download-page.json`：
 
 - `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
-- `previewFile`：手写预览片段，存在时注入中文页（放应用截图等）
+- `previewFile`：手写预览片段，存在时注入第一语言页（默认中文，放应用截图等）
 - `linkBase`：页面内互链的站点路径前缀。默认 `""`（Pages 直接上传 `./docs`，`docs/` 就是站点根）；若仓库用「拼接 `_site`」模式并把 `docs/` 作为子目录发布，填 `"/docs"`，否则两语言互链会 404
+- `languages` / `outputs`：默认 `["zh","en"]` 与固定路径；只出中文、只出英文、自定义路径都可行
+- `trackPrerelease`：默认 `false`，pre-release 不覆盖 stable 页面
+- `docsWorkflow`：刷新 workflow 提交后要 dispatch 的 Pages workflow 名，默认 `docs.yml`
+
+**生成器支持精确 tag 与机器校验**（ReleaseGraph post-release action 用它下传 exact tag，
+不依赖 `release: published` 事件——GITHUB_TOKEN 创建的 Release 不会级联触发事件）：
+
+```bash
+python3 .github/scripts/update_download_page.py owner/project --tag v1.2.3   # 精确版本
+python3 .github/scripts/update_download_page.py owner/project --language en  # 只出英文页
+python3 .github/scripts/update_download_page.py owner/project --check        # 页面 tag vs 最新 stable
+```
+
+每个生成页带机器可读 marker（`<!-- docsite-release-tag: v1.2.3 -->`），`--check` 据此报告
+`OK / STALE / MISSING / DRIFT`；**stale-write 防护**保证晚到的旧 tag runner 不会把
+已指向新版本的页面回退（`--force` 可显式覆盖）。刷新 workflow 支持
+`workflow_call` / `workflow_dispatch`（`tag` 输入）+ `release: published` 兜底，
+并在提交成功后显式 dispatch 文档站 workflow（GITHUB_TOKEN 的 push 不会触发 push 型部署）。
 
 **批量校验一致性**（确认没有仓库掉队）：
 
