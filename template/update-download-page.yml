@@ -21,23 +21,19 @@ on:
       tag:
         type: string
         required: false
-        description: Exact release tag to render (default: latest stable)
       deploy-docs:
         type: boolean
         required: false
         default: true
-        description: Also dispatch the Pages workflow after the commit. ReleaseGraph post-release actions set this to false and deploy docs as their own action.
   workflow_dispatch:
     inputs:
       tag:
         type: string
         required: false
-        description: Exact release tag to render (default: latest stable)
       deploy-docs:
         type: boolean
         required: false
         default: true
-        description: Also dispatch the Pages workflow after the commit
   release:
     types: [published]
 
