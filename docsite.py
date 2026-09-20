@@ -404,20 +404,37 @@ def published_paths(root):
     if shell.is_dir():
         out |= {"/" + str(p.relative_to(shell)) for p in shell.rglob("*") if p.is_file()}
         out |= {"/" + p.name for p in root.glob("*.md")}
-        for wf in (root / ".github" / "workflows").glob("*.y*ml"):
-            for src in re.findall(r"cp\s+-[rR]\s+(\S+)\s+_site", wf.read_text(encoding="utf-8", errors="ignore")):
-                src = src.rstrip("/")
-                if src.startswith(".") or src == "*":
-                    continue
-                target = root / src
-                if target.is_dir():
-                    out |= {"/" + str(p.relative_to(root)) for p in target.rglob("*") if p.is_file()}
-                elif target.is_file():
-                    out.add("/" + src)
+        out |= _copied_into_site(root)
     docs = root / "docs"
     if docs.is_dir():
         prefix = "/docs/" if shell.is_dir() else "/"
         out |= {prefix + str(p.relative_to(docs)) for p in docs.rglob("*") if p.is_file()}
+    return out
+
+
+def _copied_into_site(root):
+    """解析 workflow 里 `cp <src...> _site[/dest]`：外壳之外的目录（themes/tool、
+    examples/cocos/*.md）也会被发布，链接判定得认这些路径。"""
+    out = set()
+    wf_dir = root / ".github" / "workflows"
+    for wf in wf_dir.glob("*.y*ml") if wf_dir.is_dir() else []:
+        for line in wf.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line.startswith("cp ") or "_site" not in line:
+                continue
+            parts = [p for p in line.split() if not p.startswith("-")]
+            if len(parts) < 3 or not parts[-1].startswith("_site"):
+                continue
+            base = parts[-1][len("_site"):].strip("/")
+            for src in parts[1:-1]:
+                hits = list(root.glob(src)) if "*" in src else [root / src.rstrip("/")]
+                for hit in hits:
+                    if not hit.exists():
+                        continue
+                    files = [f for f in hit.rglob("*") if f.is_file()] if hit.is_dir() else [hit]
+                    for f in files:
+                        rel = str(f.relative_to(root)) if hit.is_dir() else f.name
+                        out.add("/" + f"{base}/{rel}" if base else "/" + rel)
     return out
 
 
