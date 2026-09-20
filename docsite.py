@@ -110,6 +110,30 @@ def is_managed(path):
     return "docsite: managed file" in text[:400] or "docsite-managed-file:" in text
 
 
+def default_branch(root):
+    """origin/HEAD 指向的分支名；远端信息缺失时返回 None（不猜）。"""
+    try:
+        ref = subprocess.check_output(
+            ["git", "-C", str(root), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return ref.split("/", 1)[1] if "/" in ref else ref
+
+
+def off_default_branch(root):
+    """本地 checkout 停在功能分支时返回分支名——这种漂移是本地状态，不是仓库问题。
+    托管文件只保证默认分支一致（CI 就是克隆默认分支跑）。"""
+    try:
+        current = subprocess.check_output(
+            ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"],
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None  # detached HEAD 或不是 git 仓库，不在这里判断
+    default = default_branch(root)
+    return current if default and current != default else None
+
+
 def write_file(path, text, overwrite):
     if path.exists() and not overwrite:
         return False
@@ -258,6 +282,10 @@ def cmd_check(args):
 
     rows = []
     for root in roots:
+        branch = off_default_branch(root)
+        if branch:
+            rows.append((root.name, "—", "skipped", f"本地在 {branch}，非默认分支；以 CI/远端为准"))
+            continue
         # 不是文档站（既无 docs/ 也无 .github/pages/）：例如 docsite 脚手架自身。
         if not (root / "docs").is_dir() and not (root / ".github" / "pages").is_dir():
             rows.append((root.name, "—", "skipped", "不是文档站"))
@@ -544,6 +572,10 @@ def cmd_navcheck(args):
     any_error = False
     checked = 0
     for root in roots:
+        branch = off_default_branch(root)
+        if branch:
+            print(f"➖ {root.name:<22} 本地在 {branch}，非默认分支，跳过（以 CI/远端为准）")
+            continue
         zh = root / "docs/_sidebar.md"
         if not zh.is_file():
             zh = root / ".github/pages/_sidebar.md"
