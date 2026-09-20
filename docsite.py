@@ -348,7 +348,8 @@ def cmd_check(args):
         repo = f"{m.group(1)}/{m.group(2)}"
         print(f"\n{root.name}: 下载页 vs {repo} 最新 stable Release")
         try:
-            code = subprocess.call([sys.executable, str(gen), repo, "--check"])
+            code = subprocess.call([sys.executable, str(gen), repo, "--check"],
+                                   cwd=str(root))
         except FileNotFoundError:
             code = 1
         if code != 0:
