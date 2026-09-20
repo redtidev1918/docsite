@@ -36,7 +36,8 @@ jobs:
           mkdir -p repos
           for r in PixivFlow pixiv-token-getter pixivflow-telepost-deploy TelePost \
                    dakit telepress pixivflow-webui paranote ludum graf \
-                   deviantdrop deviantart-downloader daviewer NekoTime releasegraph; do
+                   deviantdrop deviantart-downloader daviewer NekoTime releasegraph \
+                   release-infra docsite; do
             git clone --quiet --depth 1 "https://github.com/redtidev1918/$r" "repos/$r"
           done
 
