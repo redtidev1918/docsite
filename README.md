@@ -66,6 +66,10 @@ docs/
 
 同样在仓库根跑 `init`，它对老项目有保护：
 
+- 外壳目录自动识别：`docs/index.html` 存在就按新形态托管；只有 `.github/pages/index.html`
+  的老仓库（NekoTime / ludum / paranote / pixiv-token-getter / telepress，由 `static.yml`
+  把外壳与 `docs/` 内容拼成 `_site`）就把托管外壳、`assets/vendor/` 与 `.nojekyll` 写回
+  `.github/pages/`，不会在 `docs/` 里凭空长出一个 `index.html`
 - 已有的 `docs/index.html`、`.github/workflows/docs.yml` 如果**不是** docsite 托管文件，会先备份成 `*.docsite.bak`，不静默覆盖
 - 检测到别的文件名的 Pages workflow（如 `static.yml`）只提示不删除
 - 已有的 Markdown（`README.md`、`_sidebar.md` 等）一律不动

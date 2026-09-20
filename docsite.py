@@ -6,7 +6,7 @@
     python3 docsite.py check [仓库路径 ...] [--all 父目录]
     python3 docsite.py navcheck [仓库路径 ...] [--all 父目录]
 
-init      在当前仓库生成 docs/ 与 Pages 部署 workflow。
+init      在当前仓库生成 docs/（老仓库为 .github/pages/ 外壳）与 Pages 部署 workflow。
 update    只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
           永远不动你写的 Markdown。
 check     校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
@@ -15,6 +15,8 @@ navcheck  校验导航信息架构规约（确定性规则：语言侧边栏分�
 
 统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/；
 语言是站点维度——docs/_sidebar.md 与 docs/en/_sidebar.md 各自只显示当前语言。
+外壳目录自动识别：docs/index.html 存在就是新形态；只有 .github/pages/index.html 的老仓库
+（static.yml 把外壳与 docs/ 拼成 _site）同样由 init/update 托管，vendor 资源跟着外壳走。
 配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
 """
 import argparse
@@ -38,13 +40,27 @@ SYNCED = {
     "download-page.py": ".github/scripts/update_download_page.py",
     "update-download-page.yml": ".github/workflows/update-download-page.yml",
 }
-# init/update 都由模板渲染的托管文件
-MANAGED = {
-    "index.html": "docs/index.html",
-    "docs.yml": ".github/workflows/docs.yml",
-    **SYNCED,
-}
-VENDOR_DIR = Path("docs/assets/vendor")
+# 站点外壳放哪：新仓库用 docs/ 自身；老仓库（NekoTime / ludum / paranote /
+# pixiv-token-getter / telepress）把 docsify 外壳放在 .github/pages/，由 static.yml
+# 把外壳与 docs/ 内容拼成 _site 再发布。两种形态都由 init/update 托管。
+SHELL_DIRS = (Path("docs"), Path(".github/pages"))
+
+
+def shell_dir():
+    return next((d for d in SHELL_DIRS if (d / "index.html").is_file()), SHELL_DIRS[0])
+
+
+def vendor_dir():
+    return shell_dir() / "assets" / "vendor"
+
+
+def managed_files():
+    """init/update 都由模板渲染的托管文件；index.html 跟随实际外壳目录。"""
+    return {
+        "index.html": shell_dir() / "index.html",
+        "docs.yml": Path(".github/workflows/docs.yml"),
+        **{tpl: Path(dst) for tpl, dst in SYNCED.items()},
+    }
 
 
 def render(text, cfg):
@@ -62,6 +78,30 @@ def render(text, cfg):
     def sub(m):
         return tokens[m.group(1)]
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
+
+
+def origin_slug():
+    """从 git remote 推断 owner/name；老仓库的 .docsite.json 可能只声明 navigation。"""
+    try:
+        out = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"], text=True, stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?\s*$", out.strip())
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def with_defaults(cfg):
+    """补全渲染所需字段；缺失值按 git remote / 仓库名推导，绝不覆盖已写死的配置。"""
+    slug = cfg.get("repo") or origin_slug() or "owner/name"
+    name = cfg.get("name") or slug.split("/")[-1]
+    cfg.setdefault("repo", slug)
+    cfg.setdefault("name", name)
+    cfg.setdefault("emoji", "📘")
+    cfg.setdefault("description", f"{name} 文档中心。内容直接来自仓库里的 Markdown，与代码同步更新。")
+    cfg.setdefault("themeKey", f"{name.lower().replace(' ', '-')}-theme")
+    cfg.setdefault("branch", "main")
+    return cfg
 
 
 def is_managed(path):
@@ -98,9 +138,10 @@ def other_pages_workflow(dst):
 
 def copy_vendor(overwrite):
     src = TEMPLATE / "assets" / "vendor"
-    VENDOR_DIR.mkdir(parents=True, exist_ok=True)
+    target = vendor_dir()
+    target.mkdir(parents=True, exist_ok=True)
     for f in src.iterdir():
-        dst = VENDOR_DIR / f.name
+        dst = target / f.name
         if overwrite or not dst.exists():
             shutil.copy2(f, dst)
 
@@ -138,20 +179,19 @@ def cmd_init(args):
             print(f"  + docs/en/{name_}")
 
     # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
-    for tpl, dst in MANAGED.items():
-        d = Path(dst)
+    for tpl, d in managed_files().items():
         if d.name == "docs.yml":
             other = other_pages_workflow(d)
             if other:
-                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {d}（避免重复部署）")
                 continue
         if d.exists() and not is_managed(d):
             bak = Path(str(d) + ".docsite.bak")
             shutil.copy2(d, bak)
-            print(f"  ! {dst} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
+            print(f"  ! {d} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
         text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
         write_file(d, text, overwrite=True)
-        print(f"  + {dst}")
+        print(f"  + {d}")
 
     # 老项目可能用别的文件名部署 Pages（如 static.yml），不删，只提示
     wf_dir = Path(".github/workflows")
@@ -164,8 +204,8 @@ def cmd_init(args):
                 print(f"  ! 发现另一个 Pages workflow：{wf}，确认新流程正常后请删除，避免重复部署")
 
     copy_vendor(overwrite=True)
-    write_file(Path("docs/.nojekyll"), "", overwrite=True)
-    print(f"  + docs/assets/vendor/（docsify + 主题 + 搜索）")
+    write_file(shell_dir() / ".nojekyll", "", overwrite=True)
+    print(f"  + {vendor_dir()}/（docsify + 主题 + 搜索）")
 
     print(f"""
 完成。接下来：
@@ -180,22 +220,21 @@ def cmd_init(args):
 def cmd_update(_args):
     if not CONFIG.exists():
         sys.exit("找不到 .docsite.json，请先在仓库根运行 init")
-    cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
+    cfg = with_defaults(json.loads(CONFIG.read_text(encoding="utf-8")))
 
-    for tpl, dst in MANAGED.items():
-        d = Path(dst)
+    for tpl, d in managed_files().items():
         if d.name == "docs.yml":
             other = other_pages_workflow(d)
             if other:
-                print(f"  = 已有 Pages workflow {other}，跳过托管 {dst}（避免重复部署）")
+                print(f"  = 已有 Pages workflow {other}，跳过托管 {d}（避免重复部署）")
                 continue
         text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
         write_file(d, text, overwrite=True)
-        print(f"  ~ {dst}")
+        print(f"  ~ {d}")
 
     copy_vendor(overwrite=True)
-    write_file(Path("docs/.nojekyll"), "", overwrite=True)
-    print("  ~ docs/assets/vendor/ 已同步")
+    write_file(shell_dir() / ".nojekyll", "", overwrite=True)
+    print(f"  ~ {vendor_dir()}/ 已同步")
     print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
 
 
@@ -452,18 +491,21 @@ def cmd_navcheck(args):
         elif en.is_file():
             _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues)
 
-        # 明显旧结构：外壳配置检查（确定性）
-        shell = root / "docs/index.html"
-        if shell.is_file():
+        # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
+        # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。
+        for shell in (root / "docs/index.html", root / ".github/pages/index.html"):
+            if not shell.is_file():
+                continue
             stext = shell.read_text(encoding="utf-8", errors="ignore")
             # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
             if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
                 issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
-                               "index.html 配置了 '/.*/_sidebar.md' 通配 alias，会把 /en/ 页面"
-                               "静默改写回根侧边栏，破坏分语言导航", "error"))
+                               f"{shell.relative_to(root)} 配置了 '/.*/_sidebar.md' 通配 alias，"
+                               "会把 /en/ 页面静默改写回根侧边栏，破坏分语言导航", "error"))
             if re.search(r"subMaxLevel\s*:", stext):
                 issues.append((root.name, "HEADING_INJECTION",
-                               "index.html 配置了 subMaxLevel，当前页标题会被注入 sidebar 渲染", "warning"))
+                               f"{shell.relative_to(root)} 配置了 subMaxLevel，"
+                               "当前页标题会被注入 sidebar 渲染", "warning"))
 
         if not issues:
             print(f"✅ {root.name}")

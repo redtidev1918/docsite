@@ -12,6 +12,10 @@ python3 /tmp/docsite/docsite.py update
 `update` 只重写托管部分（`index.html`、`docs.yml`、`assets/vendor/`、下载页生成链路），
 按 `.docsite.json` 重新渲染，**Markdown 一律不碰**。看 diff、提交、推送。
 
+外壳目录按现状识别：`docs/index.html` 或老形态的 `.github/pages/index.html`（`static.yml`
+拼接发布的那批仓库）。托管外壳、vendor 资源与 `.nojekyll` 都跟着外壳目录走；
+`.docsite.json` 只声明了 `navigation` 时，站点名与 emoji 由 git remote 推导。
+
 多个仓库批量升级就是在各仓库各跑一次——刻意不做「一键全仓升级」，让每个仓库的 diff
 可见可控。
 
