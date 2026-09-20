@@ -2,7 +2,7 @@
 
 零依赖的 docsify 文档站脚手架。一个 Python 脚本 + 一份模板，给任何 GitHub 仓库一键长出统一风格的文档站。
 
-线上效果见：[PixivFlow](https://redtidev1918.github.io/PixivFlow/) · [dakit](https://redtidev1918.github.io/dakit/) · [TelePost](https://redtidev1918.github.io/TelePost/) · [ReleaseGraph](https://redtidev1918.github.io/releasegraph/)
+线上效果见：[PixivFlow](https://redtidev1918.github.io/PixivFlow/) · [dakit](https://redtidev1918.github.io/DAKit/) · [TelePost](https://redtidev1918.github.io/TelePost/) · [ReleaseGraph](https://redtidev1918.github.io/releasegraph/)
 
 ## 特性
 
@@ -57,7 +57,7 @@ docs/
 ```
 
 推送后 workflow 自动部署；仓库 **Settings → Pages → Source 选 GitHub Actions**（首次一般自动配好）。
-站点地址：`https://<owner>.github.io/<name>/`
+站点地址：`https://<owner>.github.io/<name>/`（`<name>` 必须用仓库名原样，Pages 路径区分大小写）
 
 ## 老项目接入（已经有 docs/ 或文档站）
 
