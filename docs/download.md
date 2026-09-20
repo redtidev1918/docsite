@@ -2,6 +2,11 @@
 
 **语言 / Language:** 中文 · [English](/en/download.md)
 
+<!-- docsite-release-repo: redtidev1918/docsite -->
+<!-- docsite-release-tag: -->
+<!-- docsite: hand-written until the first release; the managed generator
+     (update_download_page.py) rewrites this page once a release exists. -->
+
 > 本仓库没有安装包，也没有发布产物——docsite 就是一个 Python 脚本加一份模板。
 > 不需要 pip、npm、构建步骤，也不需要联网安装依赖。
 

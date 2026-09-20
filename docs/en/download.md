@@ -2,6 +2,11 @@
 
 **Language / 语言:** [中文](/download.md) · English
 
+<!-- docsite-release-repo: redtidev1918/docsite -->
+<!-- docsite-release-tag: -->
+<!-- docsite: hand-written until the first release; the managed generator
+     (update_download_page.py) rewrites this page once a release exists. -->
+
 > This repository ships no packages and no release artifacts — docsite is a single
 > Python script plus a template. No pip, no npm, no build step, no dependency install.
 
