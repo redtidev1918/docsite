@@ -48,6 +48,7 @@ class ShellDirTestCase(unittest.TestCase):
             "    loadSidebar: true,\n" + alias + "  };\n</script>\n",
             encoding="utf-8")
         (shell / "_sidebar.md").write_text("- start\n  - [home](/README.md)\n", encoding="utf-8")
+        (self.root / "README.md").write_text("# root readme\n", encoding="utf-8")
         (self.root / "docs").mkdir()
         (self.root / "docs" / "README.md").write_text("# content\n", encoding="utf-8")
         return shell
@@ -81,6 +82,21 @@ class ShellDirTestCase(unittest.TestCase):
         run = self.run_docsite("navcheck")
         self.assertEqual(run.returncode, 1)
         self.assertIn("GLOBAL_SIDEBAR_ALIAS", run.stdout)
+
+    def test_navcheck_checks_sidebar_links_against_published_paths(self):
+        shell = self.make_shell_repo()
+        (self.root / "docs" / "en").mkdir()
+        (self.root / "docs" / "en" / "README.md").write_text("# en\n", encoding="utf-8")
+        # 壳形态的英文页在 /docs/en/：写成 /en/ 就是死链
+        (self.root / "docs" / "en" / "_sidebar.md").write_text(
+            "- Docs\n  - [Home](/en/README.md)\n", encoding="utf-8")
+        run = self.run_docsite("navcheck")
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("BROKEN_SIDEBAR_LINK", run.stdout)
+        (self.root / "docs" / "en" / "_sidebar.md").write_text(
+            "- Docs\n  - [Home](/docs/en/README.md)\n", encoding="utf-8")
+        self.assertEqual(self.run_docsite("navcheck").returncode, 0)
+        self.assertEqual(shell, self.root / ".github" / "pages")
 
 
 if __name__ == "__main__":

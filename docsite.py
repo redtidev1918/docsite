@@ -391,7 +391,49 @@ def _is_external(target):
     return target.startswith(("http://", "https://", "mailto:"))
 
 
-def _navcheck_sidebar(name, path, is_en, cfg, issues):
+def published_paths(root):
+    """站点实际会发布的路径集合，用来判定侧边栏链接是否指向真实存在的页面。
+
+    新形态：upload-pages-artifact 直接上传 docs/，站点根就是 docs/。
+    老形态：static.yml 把 .github/pages/（外壳）+ 仓库根 *.md + docs/ 拼成 _site；
+            NekoTime、ludum 这类还会额外 cp -R 一些目录进 _site，所以顺带解析
+            workflow 里的 `cp -R <src> _site`。
+    """
+    shell = root / ".github" / "pages"
+    out = set()
+    if shell.is_dir():
+        out |= {"/" + str(p.relative_to(shell)) for p in shell.rglob("*") if p.is_file()}
+        out |= {"/" + p.name for p in root.glob("*.md")}
+        for wf in (root / ".github" / "workflows").glob("*.y*ml"):
+            for src in re.findall(r"cp\s+-[rR]\s+(\S+)\s+_site", wf.read_text(encoding="utf-8", errors="ignore")):
+                src = src.rstrip("/")
+                if src.startswith(".") or src == "*":
+                    continue
+                target = root / src
+                if target.is_dir():
+                    out |= {"/" + str(p.relative_to(root)) for p in target.rglob("*") if p.is_file()}
+                elif target.is_file():
+                    out.add("/" + src)
+    docs = root / "docs"
+    if docs.is_dir():
+        prefix = "/docs/" if shell.is_dir() else "/"
+        out |= {prefix + str(p.relative_to(docs)) for p in docs.rglob("*") if p.is_file()}
+    return out
+
+
+def _check_sidebar_targets(name, path, root, issues, published):
+    for _indent, label, target in _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")):
+        if target is None or _is_external(target):
+            continue
+        page = target.split("#")[0]
+        if not page or page.endswith("/"):
+            continue
+        if page not in published:
+            issues.append((name, "BROKEN_SIDEBAR_LINK",
+                           f"「{label}」-> `{target}` 在站点里不存在（未发布的路径）", "error"))
+
+
+def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
     text = path.read_text(encoding="utf-8", errors="ignore")
     items = _sidebar_items(text)
     seen = {}
@@ -420,15 +462,18 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues):
             issues.append((name, "ANCHOR_LINK", f"`{target}` —— 侧边栏不做页内目录", "error"))
         if not target.startswith("/"):
             issues.append((name, "NOT_ROOT_ABSOLUTE", f"`{target}` 非根绝对路径", "warning"))
-        if is_en and not target.startswith("/en/"):
-            if not re.search(r"中文|Chinese", label):
+        if is_en:
+            # 壳形态（.github/pages）把 docs/ 挂在 /docs/ 下，英文前缀就是 /docs/en/；
+            # 指向仓库根 README.en.md 这类英文文件（.en.md）也算英文内容。
+            if not target.startswith(en_prefix) and not re.search(r"\.en\.md(?:#|$)", target) \
+                    and not re.search(r"中文|Chinese|文档", label):
                 issues.append((name, "EN_SIDEBAR_ZH_LINK",
-                               f"`{label}` 指向非 /en/ 页面且未标注（中文）", "warning"))
+                               f"`{label}` 指向非 {en_prefix} 页面且未标注（中文）", "warning"))
     if not is_en and not cfg["allowCombinedLocales"]:
         for indent, label, target in items:
             # 标注「（英文）」的单条 fallback 链接允许（规则 20 的对称场景：
             # 页面仅有英文版时，中文侧边栏可显式标注后指向它）；整棵英文树仍然禁止
-            if (target and not _is_external(target) and target.startswith("/en/")
+            if (target and not _is_external(target) and target.startswith(en_prefix)
                     and not re.search(r"英文|English", label)):
                 issues.append((name, "COMBINED_LOCALES",
                                f"`{label}` —— 语言是站点维度，英文树应放 /en/_sidebar.md；"
@@ -449,6 +494,8 @@ def cmd_navcheck(args):
       ANCHOR_LINK        sidebar 出现页内锚点（首页目录混入导航；可用
                          .docsite.json navigation.allowSidebarAnchors 显式豁免）
       DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
+      BROKEN_SIDEBAR_LINK 侧边栏链接指向站点里不存在的页面（按实际发布路径判定：
+                         新形态站点根是 docs/，老形态是 .github/pages + 根 *.md + docs/）
       GLOBAL_SIDEBAR_ALIAS  index.html 用 '/.*/_sidebar.md' 通配 alias 强制根侧边栏
                          （破坏分语言导航，docsify 原生按目录解析即可，无需 alias）
       NAVIGATION_SCHEMA  .docsite.json 的 navigation 字段非法（未知字段 / 非布尔值 /
@@ -478,10 +525,12 @@ def cmd_navcheck(args):
             continue  # 无导航的仓库（如 docsite 自身）不参与
         checked += 1
         cfg, schema_problems = _nav_config(root)
+        # 英文内容的前缀跟着发布布局走：壳形态在 /docs/en/，新形态在 /en/。
+        en_prefix = "/docs/en/" if (root / ".github" / "pages" / "index.html").is_file() else "/en/"
         issues = []
         for problem in schema_problems:
             issues.append((root.name, "NAVIGATION_SCHEMA", problem, "error"))
-        _navcheck_sidebar(root.name, zh, is_en=False, cfg=cfg, issues=issues)
+        _navcheck_sidebar(root.name, zh, is_en=False, cfg=cfg, issues=issues, en_prefix=en_prefix)
         en = root / "docs/en/_sidebar.md"
         en_pages = [p for p in (root / "docs/en").glob("*.md")] if (root / "docs/en").is_dir() else []
         # 英文内容在根 README.en.md 的 CDN 壳仓（已声明 allowCombinedLocales）不要求 en sidebar
@@ -489,7 +538,13 @@ def cmd_navcheck(args):
             issues.append((f"{root.name}/en", "EN_SIDEBAR_MISSING",
                            "docs/en/ 有页面但没有 docs/en/_sidebar.md", "error"))
         elif en.is_file():
-            _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues)
+            _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues,
+                              en_prefix=en_prefix)
+
+        published = published_paths(root)
+        _check_sidebar_targets(root.name, zh, root, issues, published)
+        if en.is_file():
+            _check_sidebar_targets(f"{root.name}/en", en, root, issues, published)
 
         # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
         # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。

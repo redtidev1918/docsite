@@ -33,9 +33,13 @@ README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边
 | 5 | 顶级分类通常至少 2 个页面 | warning `SINGLE_PAGE_CATEGORY` |
 | 6 | 本地链接用根绝对路径 | warning `NOT_ROOT_ABSOLUTE` |
 | 7 | 英文 sidebar 指向中文页面必须标注（中文） | warning `EN_SIDEBAR_ZH_LINK` |
+| 8 | sidebar 链接必须指向站点里真实发布的页面（按发布布局判定：新形态站点根是 `docs/`，壳形态是 `.github/pages` + 根 `*.md` + `docs/`） | error `BROKEN_SIDEBAR_LINK` |
 
 error 影响退出码；warning 只提示（比如项目正在扩展分类，单页面分类是过渡状态）。
 「分类名字好不好」这类主观判断**不**自动检查。
+
+英文前缀跟着布局走：新形态是 `/en/…`，`.github/pages` 壳形态（`static.yml` 拼接发布）
+的英文页在 `/docs/en/…`；指向仓库根的 `README.en.md` 这类 `.en.md` 文件同样算英文内容。
 
 ## 默认信息架构
 
