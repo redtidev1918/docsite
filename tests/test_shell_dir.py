@@ -98,6 +98,20 @@ class ShellDirTestCase(unittest.TestCase):
         self.assertEqual(self.run_docsite("navcheck").returncode, 0)
         self.assertEqual(shell, self.root / ".github" / "pages")
 
+    def test_language_category_is_not_a_content_category(self):
+        self.make_shell_repo()
+        (self.root / "docs" / "en").mkdir()
+        (self.root / "docs" / "en" / "guide.md").write_text("# guide\n", encoding="utf-8")
+        (self.root / "docs" / "guide.md").write_text("# 指南\n", encoding="utf-8")
+        # 语言入口分类：只要一个页面，且整类标注（中文）后不再逐条报 EN_SIDEBAR_ZH_LINK
+        (self.root / "docs" / "en" / "_sidebar.md").write_text(
+            "- Docs\n  - [Guide](/docs/en/guide.md)\n\n- 中文\n  - [指南](/docs/guide.md)\n",
+            encoding="utf-8")
+        run = self.run_docsite("navcheck")
+        self.assertEqual(run.returncode, 0)
+        self.assertNotIn("「中文」", run.stdout)
+        self.assertNotIn("EN_SIDEBAR_ZH_LINK", run.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

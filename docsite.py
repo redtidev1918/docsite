@@ -454,20 +454,29 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
     text = path.read_text(encoding="utf-8", errors="ignore")
     items = _sidebar_items(text)
     seen = {}
+    # 语言入口是切换器不是内容分类：「中文」/「English」这类分类允许只有 1 个页面，
+    # 也不要求它下面的条目逐条再标注语言（分类标题已经写明了）。
+    lang_category = re.compile(r"中文|Chinese|英文|English")
     # 分类密度：统计每个顶级分类下的直接子条目（内部页与外部链接都算）
     roots = []
     current = None
     for indent, label, target in items:
         if target is None and indent == 0:
-            current = (label, [])
-            roots.append(current)
+            current = None if lang_category.search(label) else (label, [])
+            if current:
+                roots.append(current)
         elif current is not None and indent >= 1 and target is not None:
             current[1].append(target)
         elif target is not None:
             current = None  # 顶级裸链接页，不算分类
 
+    in_lang_category = False
     for indent, label, target in items:
-        if target is None or _is_external(target):
+        if target is None:
+            if indent == 0:
+                in_lang_category = bool(lang_category.search(label))
+            continue
+        if _is_external(target):
             continue
         # 锚点被显式允许时（如 CDN 壳的单 README 站点），仅锚点不同的两项是合法的不同导航项
         key = target if cfg["allowSidebarAnchors"] else target.split("#")[0].rstrip("/") or "/"
@@ -483,7 +492,7 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
             # 壳形态（.github/pages）把 docs/ 挂在 /docs/ 下，英文前缀就是 /docs/en/；
             # 指向仓库根 README.en.md 这类英文文件（.en.md）也算英文内容。
             if not target.startswith(en_prefix) and not re.search(r"\.en\.md(?:#|$)", target) \
-                    and not re.search(r"中文|Chinese|文档", label):
+                    and not re.search(r"中文|Chinese|文档", label) and not in_lang_category:
                 issues.append((name, "EN_SIDEBAR_ZH_LINK",
                                f"`{label}` 指向非 {en_prefix} 页面且未标注（中文）", "warning"))
     if not is_en and not cfg["allowCombinedLocales"]:

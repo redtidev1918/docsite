@@ -30,9 +30,9 @@ README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边
 | 2 | `docs/en/` 有页面时，`docs/en/_sidebar.md` 必须存在 | error `EN_SIDEBAR_MISSING` |
 | 3 | sidebar 不含页内锚点（`#` 链接） | error `ANCHOR_LINK` |
 | 4 | 同一目标在同一 sidebar 不得重复 | error `DUPLICATE_LINK` |
-| 5 | 顶级分类通常至少 2 个页面 | warning `SINGLE_PAGE_CATEGORY` |
+| 5 | 顶级分类通常至少 2 个页面（语言入口「中文 / English」这类分类不在此列） | warning `SINGLE_PAGE_CATEGORY` |
 | 6 | 本地链接用根绝对路径 | warning `NOT_ROOT_ABSOLUTE` |
-| 7 | 英文 sidebar 指向中文页面必须标注（中文） | warning `EN_SIDEBAR_ZH_LINK` |
+| 7 | 英文 sidebar 指向中文页面必须标注（中文）：逐条标注，或整类挂在「中文 / Chinese」分类下 | warning `EN_SIDEBAR_ZH_LINK` |
 | 8 | sidebar 链接必须指向站点里真实发布的页面（按发布布局判定：新形态站点根是 `docs/`，壳形态是 `.github/pages` + 根 `*.md` + `docs/`） | error `BROKEN_SIDEBAR_LINK` |
 
 error 影响退出码；warning 只提示（比如项目正在扩展分类，单页面分类是过渡状态）。
