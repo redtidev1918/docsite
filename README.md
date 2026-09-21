@@ -2,20 +2,20 @@
 
 **语言 / Language:** 中文 · [English documentation](https://redtidev1918.github.io/docsite/#/en/README.md)
 
-零依赖的 docsify 文档站脚手架。一个 Python 脚本加一份模板，给任何 GitHub 仓库一键长出统一风格的文档站。
+零依赖的 docsify 文档站脚手架。一个 Python 脚本加一份模板，给 GitHub 仓库配上统一风格的文档站。
 
 线上示例：[PixivFlow](https://redtidev1918.github.io/PixivFlow/) · [DAKit](https://redtidev1918.github.io/DAKit/) · [DAViewer](https://redtidev1918.github.io/DAViewer/) · [TelePost](https://redtidev1918.github.io/TelePost/) · [ReleaseGraph](https://redtidev1918.github.io/releasegraph/) · [docsite](https://redtidev1918.github.io/docsite/)
 
-## 适合你吗
+## 从哪开始
 
-| 如果你想… | 用什么 |
+| 场景 | 看这里 |
 | --- | --- |
-| 给新仓库加一个 Pages 文档站 | 直接看 [快速开始](docs/QUICKSTART.md) |
-| 保持中英文目录、下载页和侧边栏一致 | 看 [文件与命名规范](docs/CONVENTIONS.md) |
-| 只想改文档内容 | 编辑 `docs/*.md`，推送到 `main` |
-| 更新模板或托管 workflow | 看 [升级模板](docs/UPGRADE.md) |
+| 给新仓库加 Pages 文档站 | [快速开始](docs/QUICKSTART.md) |
+| 中英文目录、下载页、侧边栏的约定 | [文件与命名规范](docs/CONVENTIONS.md) |
+| 只改文档内容 | 直接编辑 `docs/*.md`，推送到 `main` |
+| 更新模板或托管 workflow | [升级模板](docs/UPGRADE.md) |
 
-docsite 只负责外壳和部署链路，不管理 Markdown 内容。你的正文、侧边栏结构和技术文档都保留在仓库里，模板升级不会覆盖它们。
+docsite 只管外壳和部署链路，Markdown 留在仓库里。正文、侧边栏结构和技术文档都不会被模板升级覆盖。
 
 ## 快速开始
 
@@ -78,7 +78,7 @@ python3 docsite.py update
 
 ## 非目标
 
-docsite 不做按语言自动跳转的路由、服务端搜索或自定义主题系统。它刻意避免“一键批量升级所有仓库”，让每个接入仓库的 diff 都能被看见和审查。
+docsite 不做按语言自动跳转的路由、服务端搜索或自定义主题系统。批量升级也不做成“一键全仓”，每个仓库自己跑 `update`，diff 可见可控。
 
 ## 许可
 

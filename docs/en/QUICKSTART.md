@@ -60,11 +60,11 @@ Afterwards:
 
 ## Day-to-day edits
 
-No script needed — edit Markdown directly:
+No script needed. Edit Markdown directly:
 
 1. Add or change a `.md` under `docs/`
 2. Add its link to `docs/_sidebar.md` using a **root-absolute path** (`- [Title](/PAGE.md)`)
-3. `git commit && git push` — the workflow watches `docs/**` and the site updates in a
+3. `git commit && git push`. The workflow watches `docs/**` and the site updates in a
    minute or two
 
 A relative sidebar link (`[Title](PAGE.md)`) breaks with a 404 on `docs/en/` pages.

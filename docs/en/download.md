@@ -7,7 +7,7 @@
 <!-- docsite: hand-written until the first release; the managed generator
      (update_download_page.py) rewrites this page once a release exists. -->
 
-> This repository ships no packages and no release artifacts — docsite is a single
+> This repository ships no packages and no release artifacts. docsite is a single
 > Python script plus a template. No pip, no npm, no build step, no dependency install.
 
 ## How to get it
@@ -24,9 +24,9 @@ python3 /tmp/docsite/docsite.py --help
 
 ## Why there are no Releases
 
-docsite ships no binaries and publishes to no package index: its value is the
-**template**, and the template travels with the repository. Every managed repo runs
-`python3 /tmp/docsite/docsite.py update` from that same clone — an extra download step
+docsite's value is the template, and the template travels with the repository, so
+docsite ships no binaries and publishes to no package index. Every managed repo runs
+`python3 /tmp/docsite/docsite.py update` from that same clone; an extra download step
 would only add another copy that can go stale.
 
 To pin a version, check out the commit or tag:
@@ -37,4 +37,4 @@ git -C /tmp/docsite checkout <commit>
 
 ## Next
 
-- [Quick Start](/en/QUICKSTART.md) — attach a docs site to a repository
+- [Quick Start](/en/QUICKSTART.md): attach a docs site to a repository

@@ -19,8 +19,8 @@
 | 侧边栏（`docs/_sidebar.md` / `docs/en/_sidebar.md`） | 导航**独立页面** | 不收录首页页内锚点 |
 | 页内目录 | 当前页的标题结构 | 不替代分类导航 |
 
-README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边栏要同步出现——
-只有当它成为独立文档页面时才考虑加入。
+README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边栏要同步出现；
+只有它成为独立文档页面时才考虑加入。
 
 ## 可检查的 invariant（`docsite.py navcheck`）
 
@@ -57,7 +57,7 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
   Getting Started / Usage & Configuration / Development / Project），
   避免「基础信息」「技术资料」「其他」这类模糊词
 - 页面标题要比分类更具体（`开发 → 架构说明`，不是 `开发 → 开发`）
-- 首页在 sidebar 里叫「概览」（Overview），不叫「文档中心」——用户已经在文档站里
+- 首页在 sidebar 里叫「概览」（Overview），不叫「文档中心」，因为用户已经在文档站里
 - 下载只保留一个 sidebar 入口（`开始 → 下载`）；首页可以再有下载按钮，这不算重复
 - sidebar 不是网站地图：CHANGELOG、LICENSE、SECURITY、内部 notes 是否进入取决于
   是否需要经常导航，文件存在 ≠ 必须出现在 sidebar
@@ -72,7 +72,7 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
 - 英文 sidebar 不放「伪英文入口」；确需 fallback 时必须标注（中文）/ Chinese only
 
 docsify **原生按页面所在目录取 `_sidebar.md`**：根页面读 `/_sidebar.md`，`/en/` 页面读
-`/en/_sidebar.md`——两种侧边栏都存在时**不需要 alias**。实测注意两个坑：
+`/en/_sidebar.md`。两种侧边栏都存在时**不需要 alias**。实测注意两个坑：
 
 - 不要配置 `/.*/_sidebar.md` 之类的通配 alias「统一侧边栏」：docsify 先对 sidebar 请求路径
   （`/en/_sidebar.md`）做 alias 改写再取文件，通配规则会把英文页面静默改写回中文侧边栏
@@ -96,13 +96,13 @@ docsify **原生按页面所在目录取 `_sidebar.md`**：根页面读 `/_sideb
 
 **schema 为白名单制**：`navigation` 下仅允许 `allowSidebarAnchors`、`allowCombinedLocales`
 两个字段，且必须为布尔值。未知字段、错误类型、非法 JSON 都会被 `navcheck` 以
-`NAVIGATION_SCHEMA`（error）拒绝——例外是仓库声明自己的能力边界，不是万能逃生口，
+`NAVIGATION_SCHEMA`（error）拒绝；例外是仓库声明自己的能力边界，不是万能逃生口，
 不允许长出 `ignoreEverything` 之类的字段。
 
 ## CI gate
 
 本仓库的 `.github/workflows/navcheck.yml` 每周与相关文件变更时，对全部受管仓库运行
-`docsite.py navcheck --all`——红即契约被破坏。
+`docsite.py navcheck --all`，红即契约被破坏。
 
 > `docsite.py navcheck --all` 全绿，表示所有受管仓库满足 canonical 导航结构约束；
 > 任何结构性例外必须由仓库通过 `.docsite.json` 显式声明，checker 不允许静默兼容。

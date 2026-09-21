@@ -16,7 +16,7 @@ python3 /tmp/docsite/docsite.py update
 拼接发布的那批仓库）。托管外壳、vendor 资源与 `.nojekyll` 都跟着外壳目录走；
 `.docsite.json` 只声明了 `navigation` 时，站点名与 emoji 由 git remote 推导。
 
-多个仓库批量升级就是在各仓库各跑一次——刻意不做「一键全仓升级」，让每个仓库的 diff
+多个仓库批量升级就是在各仓库各跑一次，刻意不做「一键全仓升级」，让每个仓库的 diff
 可见可控。
 
 ## 升级 Actions 版本

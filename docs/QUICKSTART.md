@@ -60,7 +60,7 @@ python3 /tmp/docsite/docsite.py init \
 
 1. 在 `docs/` 加或改 `.md`
 2. 在 `docs/_sidebar.md` 里加链接（**根绝对路径**：`- [标题](/PAGE.md)`）
-3. `git commit && git push`——workflow 监听 `docs/**`，一两分钟后线上更新
+3. `git commit && git push`，workflow 监听 `docs/**`，一两分钟后线上更新
 
 侧边栏写成相对路径（`[标题](PAGE.md)`）时，在 `docs/en/` 子页面上会 404。
 

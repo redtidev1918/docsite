@@ -33,7 +33,7 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 
 - 现存特例：`Graf` 的 `CHANGELOG.md` 由 release-please 自动维护（英文、标准文件名），
   `CHANGELOG.zh-CN.md` 是中文翻译副本；`THIRD_PARTY_NOTICES.md` 同理。
-  这是有意保留的特例，不是技术债——强行把中文设为主文件会让 release-please
+  这是有意保留的特例，不是技术债；强行把中文设为主文件会让 release-please
   反向破坏发布自动化，任何「清理」这类文件的 PR 都应拒绝。
 - 判定口径：若一个文件的「正确文件名」由某个工具（release-please、许可证扫描器、
   GitHub 内置功能）按字面约定读取，它就属于本例外；只有纯给人看的页面才受命名规范约束。
@@ -54,7 +54,7 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 # docsite-managed-version: 1
 ```
 
-**为什么要托管**：此前 6 个仓库各存一份手改副本——行数 146–149、md5 全不相同，而且
+**为什么要托管**：此前 6 个仓库各存一份手改副本，行数 146–149、md5 全不相同，而且
 **没有任何 workflow 真正调用它**。结果是下载页上「本页由 GitHub Actions 在每次发版时
 自动更新」是假的，页面长期停在旧版本（例：仓库已发 v1.12.0，页面还写着 v1.11.0）。
 托管后只维护一份，`update` 统一下发。
@@ -84,7 +84,7 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 ### 精确 tag 与机器校验
 
 ReleaseGraph post-release action 用这个能力下传 exact tag，不依赖 `release: published`
-事件——GITHUB_TOKEN 创建的 Release 不会级联触发事件：
+事件，因为 GITHUB_TOKEN 创建的 Release 不会级联触发事件：
 
 ```bash
 python3 .github/scripts/update_download_page.py owner/project --tag v1.2.3   # 精确版本
@@ -109,8 +109,8 @@ python3 .github/scripts/update_download_page.py owner/project --check        # �
 ## 部署 workflow
 
 `docsite init` 生成 `.github/workflows/docs.yml`。早期接入的仓库沿用了 GitHub 默认模板名
-`static.yml`——**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。
-只需保证：
+`static.yml`。**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。
+要求：
 
 - 只保留**一个** Pages 部署 workflow，避免重复部署
 - 触发分支与 `.docsite.json` 的 `branch` 一致
