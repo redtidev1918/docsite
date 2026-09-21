@@ -1,6 +1,6 @@
 # docsite
 
-**零依赖的 docsify 文档站脚手架。**
+> **零依赖的 docsify 文档站脚手架。**
 
 一个 Python 脚本 + 一份模板，给任何 GitHub 仓库一键长出统一风格的文档站。
 
