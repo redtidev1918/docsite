@@ -1,0 +1,44 @@
+# docsite: 管理文件，由 docsite 模板维护。
+# 文档生命周期契约 CI gate：对全账号受管仓库运行 docsite.py lifecyclecheck --all。
+# 全绿 = 没有非规范根文档、没有未归档的阶段/一次性文档、归档文件元数据完整且未过期。
+
+name: Document lifecycle check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # 每周一 03:00 UTC
+  push:
+    branches:
+      - main
+    paths:
+      - 'docsite.py'
+      - 'docs/CONVENTIONS.md'
+      - '.github/workflows/doclifecycle.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "doclifecycle"
+  cancel-in-progress: false
+
+jobs:
+  lifecyclecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docsite
+        uses: actions/checkout@v7
+
+      - name: Clone managed repositories
+        run: |
+          mkdir -p repos
+          for r in PixivFlow pixiv-token-getter pixivflow-telepost-deploy TelePost \
+                   dakit telepress pixivflow-webui paranote ludum graf \
+                   deviantdrop deviantart-downloader daviewer NekoTime releasegraph \
+                   release-infra docsite; do
+            git clone --quiet --depth 1 "https://github.com/redtidev1918/$r" "repos/$r"
+          done
+
+      - name: Run lifecyclecheck
+        run: python3 docsite.py lifecyclecheck --all repos

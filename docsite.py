@@ -5,6 +5,7 @@
     python3 docsite.py update
     python3 docsite.py check [仓库路径 ...] [--all 父目录]
     python3 docsite.py navcheck [仓库路径 ...] [--all 父目录]
+    python3 docsite.py lifecyclecheck [仓库路径 ...] [--all 父目录]
 
 init      在当前仓库生成 docs/（老仓库为 .github/pages/ 外壳）与 Pages 部署 workflow。
 update    只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
@@ -12,6 +13,8 @@ update    只刷新托管文件（index.html / workflow / vendor / 下载页生�
 check     校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
 navcheck  校验导航信息架构规约（确定性规则：语言侧边栏分离、无页内锚点、
           无重复链接、en 侧边栏存在；单页面分类等软规则仅 warning）。
+lifecyclecheck 校验一次性/阶段文档生命周期（根目录白名单、archive 元数据、
+           过期清理、sidebar 不收录归档）。
 
 统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/；
 语言是站点维度——docs/_sidebar.md 与 docs/en/_sidebar.md 各自只显示当前语言。
@@ -25,6 +28,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent / "template"
@@ -34,6 +38,31 @@ CONFIG = Path(".docsite.json")
 CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
 # 英文镜像内容（docs/en/ 下同名文件）
 EN_CONTENT_FILES = ["_sidebar.md", "README.md", "QUICKSTART.md", "download.md"]
+# 允许留在仓库根的规范 Markdown。一次性报告、阶段快照、交接/状态文一律不在这里；
+# 确需长期保留的走 docs/archive/ 并带生命周期块。
+ROOT_DOC_ALLOW = {
+    "README.md", "README.en.md", "AGENTS.md",
+    "CHANGELOG.md", "CHANGELOG.en.md", "CHANGELOG.zh-CN.md",
+    "CONTRIBUTING.md", "SECURITY.md", "SECURITY.en.md",
+    "CODE_OF_CONDUCT.md", "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.zh-CN.md",
+    "DEPLOYMENT.md", "ROADMAP.md", "RELEASING.md", "RELEASE_NOTES.md",
+    "MIGRATION.md", "MIGRATION.en.md",
+    "ACKNOWLEDGMENTS.md", "ACKNOWLEDGMENTS.en.md",
+    "CONTRACT.md", "STATUS.md", "UML.md",
+}
+# 一眼可识别的「一次性/阶段」信号：文件名带日期，或 status/handoff/report/plan
+# 等后缀。这类文件出现在用户文档区且未进 archive 时视为违规。
+TRANSIENT_NAME = re.compile(
+    r"(?:20\d{2}-\d{2}-\d{2}|-(?:status|handoff|takeover|dryrun|postfix|snapshot|"
+    r"reconciliation|ship-status|push-report|report)(?:\.md)?$)",
+    re.I,
+)
+VALID_DOC_TYPES = {
+    "one-off", "phase-report", "audit", "incident", "handoff",
+    "runbook", "decision", "evidence",
+}
+ARCHIVE_STATUSES = {"complete", "superseded", "archived"}
 # 托管且要求「跨仓库逐字节一致」的文件（下载页生成链路）。
 # 不含模板 token，因此可直接比对；docsite.py check 用它做一致性校验。
 SYNCED = {
@@ -639,6 +668,155 @@ def cmd_navcheck(args):
     return 0
 
 
+def _archive_dirs(root):
+    """账号统一归档目录：docs/archive 为主，无文档站的仓库允许根 archive/。"""
+    return [
+        d for d in (
+            root / "docs" / "archive",
+            root / "docs" / "en" / "archive",
+            root / "archive",
+        )
+        if d.is_dir()
+    ]
+
+
+def _docs_files(root):
+    docs = root / "docs"
+    return sorted(docs.rglob("*.md")) if docs.is_dir() else []
+
+
+def _transient_docs(root, archive_dirs):
+    """用户文档区里的一眼可见阶段/一次性文件；incidents/adr/regressions 除外。"""
+    out = []
+    for p in _docs_files(root):
+        if any(str(p).startswith(str(d)) for d in archive_dirs):
+            continue
+        rel = p.relative_to(root / "docs").as_posix()
+        if rel.startswith(("incidents/", "adr/", "regressions/",
+                           "en/incidents/", "en/adr/", "en/regressions/")):
+            continue
+        if p.name in ("_sidebar.md", "README.md", "download.md", "download-preview.md"):
+            continue
+        if TRANSIENT_NAME.search(rel) or TRANSIENT_NAME.search(p.name):
+            out.append(p)
+    return out
+
+
+def _lifecycle_meta(path):
+    """归档文档要求头部生命周期块；顺序不要求，但字段名固定。"""
+    head = path.read_text(encoding="utf-8", errors="ignore")[:1500]
+    marked = bool(re.search(r"(?im)^\s*(?:<!--\s*)?doc-lifecycle\s*:\s*archive", head))
+    fields = {}
+    for line in head.splitlines():
+        m = re.match(r"^\s*(Doc-Type|Status|Effective|Expires|Superseded-By)\s*:\s*(.+?)\s*$",
+                     line, re.I)
+        if m:
+            fields[m.group(1).lower()] = m.group(2).strip()
+    return marked, fields
+
+
+def _archive_sidebar_links(root):
+    """归档目录是索引/自动化区域，不进入用户导航侧边栏。"""
+    issues = []
+    for path in (root / "docs" / "_sidebar.md",
+                 root / "docs" / "en" / "_sidebar.md",
+                 root / ".github" / "pages" / "_sidebar.md"):
+        if not path.is_file():
+            continue
+        for _indent, _label, target in _sidebar_items(path.read_text(
+                encoding="utf-8", errors="ignore")):
+            if target and not _is_external(target) and "archive" in target.lower():
+                issues.append((path.name, "ARCHIVE_IN_SIDEBAR",
+                               f"`{target}` 指向 archive，归档内容不应进入用户导航", "error"))
+    return issues
+
+
+def cmd_lifecyclecheck(args):
+    """一次性/阶段文档生命周期检查：
+
+    error（返回非零）：
+      ROOT_TRANSIENT_DOC        仓库根出现非规范 Markdown（应删除，或作为
+                                决策/证据迁入 docs/archive/）
+      TRANSIENT_DOC_NOT_ARCHIVED 用户文档区出现带日期或 status/handoff/
+                                report/dryrun 等信号的文件，且不在 docs/archive/
+      ARCHIVE_METADATA           归档文件缺 Doc-Lifecycle 块或头字段非法
+      ARCHIVE_EXPIRED            归档文件 Expires 已过（应清理或续期）
+      ARCHIVE_IN_SIDEBAR         归档文件被放进用户侧边栏
+    """
+    if args.all:
+        base = Path(args.all)
+        if not base.is_dir():
+            sys.exit(f"{base} 不是目录")
+        roots = sorted(p for p in base.iterdir() if (p / ".git").is_dir())
+    else:
+        roots = [Path(p) for p in (args.paths or ["."])]
+
+    any_error = False
+    checked = 0
+    today = date.today()
+    for root in roots:
+        branch = off_default_branch(root)
+        if branch:
+            print(f"➖ {root.name:<22} 本地在 {branch}，非默认分支，跳过（以 CI/远端为准）")
+            continue
+        checked += 1
+        issues = []
+
+        for p in sorted(root.glob("*.md")):
+            if p.name not in ROOT_DOC_ALLOW:
+                issues.append((p.name, "ROOT_TRANSIENT_DOC",
+                               f"根目录非规范 Markdown；一次性/阶段文档应删除或归档", "error"))
+
+        archive_dirs = _archive_dirs(root)
+        for p in _transient_docs(root, archive_dirs):
+            rel = p.relative_to(root).as_posix()
+            issues.append((rel, "TRANSIENT_DOC_NOT_ARCHIVED",
+                           "带日期/阶段信号但仍留在用户文档区；迁入 docs/archive/ 并补生命周期块",
+                           "error"))
+
+        for p in sorted(f for d in archive_dirs for f in d.rglob("*.md")):
+            rel = p.relative_to(root).as_posix()
+            marked, fields = _lifecycle_meta(p)
+            problems = []
+            if not marked:
+                problems.append("Doc-Lifecycle: archive")
+            dtype = fields.get("doc-type", "").lower()
+            if dtype not in VALID_DOC_TYPES:
+                problems.append(f"Doc-Type ∈ {', '.join(sorted(VALID_DOC_TYPES))}")
+            status = fields.get("status", "").lower()
+            if status not in ARCHIVE_STATUSES:
+                problems.append(f"Status ∈ {', '.join(sorted(ARCHIVE_STATUSES))}")
+            for key in ("effective", "expires"):
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fields.get(key, "")):
+                    problems.append(f"{key.title()}: YYYY-MM-DD")
+            if problems:
+                issues.append((rel, "ARCHIVE_METADATA", "; ".join(problems), "error"))
+            else:
+                expires = date.fromisoformat(fields["expires"])
+                if expires < today:
+                    issues.append((rel, "ARCHIVE_EXPIRED",
+                                   f"Expires {fields['expires']} 已过；应清理或续期", "error"))
+
+        issues += _archive_sidebar_links(root)
+
+        if not issues:
+            print(f"✅ {root.name}")
+            continue
+        errors = [i for i in issues if i[3] == "error"]
+        for name, rule, note, level in issues:
+            mark = "❌" if level == "error" else "⚠️ "
+            print(f"{mark} {root.name:<22} {rule:<22} {name:<38} {note}")
+        if errors:
+            any_error = True
+
+    print(f"\n{checked} 个仓库参与生命周期检查；error 以 ❌ 标出。")
+    if any_error:
+        print("修复参考：docsite CONVENTIONS「一次性与阶段文档生命周期」；"
+              "需要保留的证据统一放 docs/archive/ 并补生命周期块。")
+        return 1
+    return 0
+
+
 def main():
     if not TEMPLATE.exists():
         sys.exit(f"找不到模板目录 {TEMPLATE}")
@@ -666,6 +844,12 @@ def main():
     n.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
     n.add_argument("--all", help="扫描该目录下所有 git 仓库")
     n.set_defaults(func=cmd_navcheck)
+
+    l = sub.add_parser("lifecyclecheck",
+                       help="校验一次性/阶段文档生命周期（根目录、archive 与 sidebar）")
+    l.add_argument("paths", nargs="*", help="仓库路径，默认当前目录")
+    l.add_argument("--all", help="扫描该目录下所有 git 仓库")
+    l.set_defaults(func=cmd_lifecyclecheck)
 
     args = p.parse_args()
     sys.exit(args.func(args) or 0)

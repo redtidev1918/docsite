@@ -33,10 +33,64 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 
 - 现存特例：`Graf` 的 `CHANGELOG.md` 由 release-please 自动维护（英文、标准文件名），
   `CHANGELOG.zh-CN.md` 是中文翻译副本；`THIRD_PARTY_NOTICES.md` 同理。
-  这是有意保留的特例，不是技术债——强行把中文设为主文件会让 release-please
+  这是有意保留的特例，不是技术债；强行把中文设为主文件会让 release-please
   反向破坏发布自动化，任何「清理」这类文件的 PR 都应拒绝。
 - 判定口径：若一个文件的「正确文件名」由某个工具（release-please、许可证扫描器、
   GitHub 内置功能）按字面约定读取，它就属于本例外；只有纯给人看的页面才受命名规范约束。
+
+## 一次性与阶段文档生命周期
+
+仓库根目录、`docs/` 用户文档区和 Agent 规范区**只放长期有效内容**。一次性报告、
+阶段快照、交接/状态文、审计/验证结果不是长期记忆，默认不允许进入仓库。
+
+| 类别 | 位置 | 生命周期 |
+| :-- | :-- | :-- |
+| 用户文档 | `docs/`（用户文档站）/ 根 README | 持续更新，旧页面原地覆盖，不叠加 `-v2/-final/-postfix` 副本 |
+| 决策/证据记录 | `docs/architecture/`、`docs/adr/`、`docs/incidents/` | 保持不可变记录，Status 写当前状态，完成后如实标记，不删除事实 |
+| 一次性/阶段文档 | 工作区归档或 `docs/archive/` | 任务完成后删除；确需保留时进 `docs/archive/` 并带生命周期块 |
+
+### 默认纪律
+
+1. **任务完成后丢弃**：一次性报告、阶段状态、交接快照、dry-run/审计输出默认不进仓库，
+   保留在工作区临时目录或任务记录中；无长期用途的完成任务后直接删除。
+2. **现状文档原地更新**：`current-state`、roadmap 状态、发布门禁等阶段信息只维护唯一
+   当前文件；禁止通过新增 `*-2026-09-12.md`、`*-final.md`、`*-postfix.md` 之类文件保存阶段。
+3. **确需保留时归档**：取证、ADR、事故记录、已完成但仍有参考价值的设计稿放到
+   `docs/archive/`（无文档站的仓库也可用根 `archive/`），不进入用户侧边栏。
+4. **归档文件必须有生命周期块**，便于索引和自动化清理：
+
+   ```markdown
+   <!-- doc-lifecycle: archive -->
+   Doc-Type: phase-report        # one-off | phase-report | audit | incident | handoff | runbook | decision | evidence
+   Status: complete              # complete | superseded | archived
+   Effective: 2026-09-12
+   Expires: 2027-09-12
+   Superseded-By: docs/README.md # 可选，指代当前事实源
+   ---
+   ```
+
+5. **过期即清理或续期**：`Expires` 已过的归档文件必须删除或更新后再保留；
+   `docsite.py lifecyclecheck` 会把过期归档当作 error。
+
+### 机器检查
+
+```bash
+python3 /path/to/docsite/docsite.py lifecyclecheck <仓库路径...>
+python3 /path/to/docsite/docsite.py lifecyclecheck --all /path/to/code
+```
+
+检查项：
+
+| 规则 | 说明 | 级别 |
+| :-- | :-- | :-- |
+| `ROOT_TRANSIENT_DOC` | 仓库根出现规范白名单之外的 Markdown | error |
+| `TRANSIENT_DOC_NOT_ARCHIVED` | 用户文档区出现带日期或 status/handoff/report/dryrun 等信号的文件且未归档 | error |
+| `ARCHIVE_METADATA` | 归档文件缺 `Doc-Lifecycle` 块或头部字段非法 | error |
+| `ARCHIVE_EXPIRED` | 归档文件 `Expires` 已过 | error |
+| `ARCHIVE_IN_SIDEBAR` | 归档内容被放进用户侧边栏 | error |
+
+本仓库的 `.github/workflows/doclifecycle.yml` 每周及规范变更时对全部受管仓库运行该检查；
+其余仓库接入时直接使用同一个 `docsite.py lifecyclecheck` 即可。
 
 ## 下载页生成链路（托管）
 
@@ -54,7 +108,7 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 # docsite-managed-version: 1
 ```
 
-**为什么要托管**：此前 6 个仓库各存一份手改副本——行数 146–149、md5 全不相同，而且
+**为什么要托管**：此前 6 个仓库各存一份手改副本，行数 146–149、md5 全不相同，而且
 **没有任何 workflow 真正调用它**。结果是下载页上「本页由 GitHub Actions 在每次发版时
 自动更新」是假的，页面长期停在旧版本（例：仓库已发 v1.12.0，页面还写着 v1.11.0）。
 托管后只维护一份，`update` 统一下发。
@@ -84,7 +138,7 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 ### 精确 tag 与机器校验
 
 ReleaseGraph post-release action 用这个能力下传 exact tag，不依赖 `release: published`
-事件——GITHUB_TOKEN 创建的 Release 不会级联触发事件：
+事件，因为 GITHUB_TOKEN 创建的 Release 不会级联触发事件：
 
 ```bash
 python3 .github/scripts/update_download_page.py owner/project --tag v1.2.3   # 精确版本
@@ -109,8 +163,8 @@ python3 .github/scripts/update_download_page.py owner/project --check        # �
 ## 部署 workflow
 
 `docsite init` 生成 `.github/workflows/docs.yml`。早期接入的仓库沿用了 GitHub 默认模板名
-`static.yml`——**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。
-只需保证：
+`static.yml`。**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。
+要求：
 
 - 只保留**一个** Pages 部署 workflow，避免重复部署
 - 触发分支与 `.docsite.json` 的 `branch` 一致
