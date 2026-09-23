@@ -437,7 +437,7 @@ def published_paths(root):
     docs = root / "docs"
     if docs.is_dir():
         prefix = "/docs/" if shell.is_dir() else "/"
-        out |= {prefix + str(p.relative_to(docs)) for p in docs.rglob("*") if p.is_file()}
+        out |= {prefix + p.relative_to(docs).as_posix() for p in docs.rglob("*") if p.is_file()}
     return out
 
 
