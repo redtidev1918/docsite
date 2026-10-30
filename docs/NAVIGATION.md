@@ -1,32 +1,24 @@
-# 导航契约
+# 导航规则
 
 **语言 / Language:** 中文 · [English](/en/NAVIGATION.md)
 
-## 哲学
+侧边栏按读者要找的内容分组。中文和英文各用一份侧边栏，通过页面顶部的菜单切换语言。
 
-> 导航按用户任务组织，而不是按仓库文件结构组织。
-> 语言是站点维度，不是导航分类。
-> 首页负责介绍和分流；侧边栏负责页面导航；页内目录负责当前页面结构。
-> 三者不要互相复制。
-
-核心一句话：**Sidebar is navigation, not a table of contents.**
-
-## 职责分离
+## 首页、侧边栏和页内目录
 
 | 层 | 职责 | 不负责 |
 | :-- | :-- | :-- |
 | 首页（`docs/README.md` / `docs/en/README.md`） | 项目是什么、适合谁、主要入口、下载按钮 | 不充当全站目录 |
-| 侧边栏（`docs/_sidebar.md` / `docs/en/_sidebar.md`） | 导航**独立页面** | 不收录首页页内锚点 |
+| 侧边栏（`docs/_sidebar.md` / `docs/en/_sidebar.md`） | 链接独立页面 | 不收录首页页内锚点 |
 | 页内目录 | 当前页的标题结构 | 不替代分类导航 |
 
-README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边栏要同步出现；
-只有它成为独立文档页面时才考虑加入。
+README 里新增 FAQ、路线图或致谢小节时，不用同步添加侧边栏入口；拆成独立页面后再添加。
 
-## 可检查的 invariant（`docsite.py navcheck`）
+## navcheck 检查项
 
 | # | 规则 | 级别 |
 | :-- | :-- | :-- |
-| 1 | 根 sidebar 不包含 `/en/` 文档树（语言是站点维度）；指向仅有英文版的页面时，标注「（英文）」的单条 fallback 链接允许 | error `COMBINED_LOCALES` |
+| 1 | 根 sidebar 不包含整组 `/en/` 页面；可以单独链接仅有英文版的页面，并标注“（英文）” | error `COMBINED_LOCALES` |
 | 2 | `docs/en/` 有页面时，`docs/en/_sidebar.md` 必须存在 | error `EN_SIDEBAR_MISSING` |
 | 3 | sidebar 不含页内锚点（`#` 链接） | error `ANCHOR_LINK` |
 | 4 | 同一目标在同一 sidebar 不得重复 | error `DUPLICATE_LINK` |
@@ -36,14 +28,13 @@ README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边
 | 8 | v2 sidebar 链接必须对应 docs/ 下真实页面；`/` 对应 README.md、`.md` 后缀转换为 VitePress 路径 | error `BROKEN_SIDEBAR_LINK` |
 | 9 | sidebar.generated.mjs 必须与 _sidebar.md 再生成结果一致 | error `SIDEBAR_STALE` |
 
-error 影响退出码；warning 只提示（比如项目正在扩展分类，单页面分类是过渡状态）。
-「分类名字好不好」这类主观判断**不**自动检查。
+error 会使命令失败，warning 只提示。分类名称是否合适仍需自己检查。
 
 v2 英文前缀固定为 `/en/…`，用户只维护两种语言的 `_sidebar.md`，修改后运行 update。旧 v1 未迁移时仍按旧发布布局校验；其壳形态英文页在 `/docs/en/…`。
 
-## 默认信息架构
+## 分类示例
 
-中小型项目（少于约 8~10 个独立页面）用 2~4 个分类，常用页面 1 次点击可达，最多 2 层：
+页面不多时，可以用两到四个分类，最多两层：
 
 ```text
 开始            概览 / 下载 / 快速开始
@@ -52,33 +43,24 @@ v2 英文前缀固定为 `/en/…`，用户只维护两种语言的 `_sidebar.md
 项目            参与贡献 / 安全 / 合规（仅当存在独立页面时才出现）
 ```
 
-- 不要求四组全有，禁止为模板完整创建空壳页面
-- 分类命名用任务型词汇（开始 / 使用与配置 / 开发 / 项目；
-  Getting Started / Usage & Configuration / Development / Project），
-  避免「基础信息」「技术资料」「其他」这类模糊词
-- 页面标题要比分类更具体（`开发 → 架构说明`，不是 `开发 → 开发`）
-- 首页在 sidebar 里叫「概览」（Overview），不叫「文档中心」，因为用户已经在文档站里
-- 下载只保留一个 sidebar 入口（`开始 → 下载`）；首页可以再有下载按钮，这不算重复
-- sidebar 不是网站地图：CHANGELOG、LICENSE、SECURITY、内部 notes 是否进入取决于
-  是否需要经常导航，文件存在 ≠ 必须出现在 sidebar
+按已有内容选择分类，不用凑齐四组。名称尽量具体，如“开发 → 架构说明”。首页入口用“概览”，下载页在侧边栏放一处即可。CHANGELOG、LICENSE、SECURITY 等文件按阅读需要添加，不必把仓库里的每个文件都列出来。
 
 ## VitePress 语言与侧边栏
 
 - 每种语言一套 sidebar：`docs/_sidebar.md`（中文）与 `docs/en/_sidebar.md`（英文），
   各自只显示当前语言
-- 语言切换放在**页面顶部**，子页面优先指向对应翻译页
+- 语言切换放在页面顶部，子页面优先指向对应翻译页
   （`/authentication.md ↔ /en/authentication.md`）；无对应翻译时回到该语言首页；
   不要把语言切换塞进 sidebar 分类树
-- 英文 sidebar 不放「伪英文入口」；确需 fallback 时必须标注（中文）/ Chinese only
+- 英文 sidebar 引用中文页时，标注“（中文）”或 Chinese only
 
 VitePress config 导入生成 sidebar；保留分类、顺序与两级缩进，外链原样保留，Markdown 链接去掉 .md 后缀。README.md 通过 rewrites 成为首页。语言菜单使用 locales；有对应翻译时切到同一页面。应实际检查缺翻译时的回退行为，并补齐正文中的语言链接以避免 dead link。
 
 V2 不再使用 Docsify alias/subMaxLevel，GLOBAL_SIDEBAR_ALIAS 与 HEADING_INJECTION 仅在旧 v1 规则表中保留；页面目录由默认主题 outline 提供。本地搜索不依赖外部服务。
 
-## 显式例外
+## 配置例外
 
-确需保留页内锚点或单 sidebar 双语的仓库（如 CDN 壳站点、超长单页规范），写入仓库根
-`.docsite.json`，检查器不静默忽略：
+如果站点需要页内锚点，或需要在同一侧边栏放中英文页面，在 `.docsite.json` 中设置：
 
 ```json
 {
@@ -89,21 +71,12 @@ V2 不再使用 Docsify alias/subMaxLevel，GLOBAL_SIDEBAR_ALIAS 与 HEADING_INJ
 }
 ```
 
-**schema 为白名单制**：`navigation` 下仅允许 `allowSidebarAnchors`、`allowCombinedLocales`
-两个字段，且必须为布尔值。未知字段、错误类型、非法 JSON 都会被 `navcheck` 以
-`NAVIGATION_SCHEMA`（error）拒绝；例外是仓库声明自己的能力边界，不是万能逃生口，
-不允许长出 `ignoreEverything` 之类的字段。
+`navigation` 只接受这两个布尔字段。未知字段、错误类型和非法 JSON 会报 `NAVIGATION_SCHEMA` 错误。
 
-## CI gate
+## CI 检查
 
-本仓库的 `.github/workflows/navcheck.yml` 每周与相关文件变更时，对全部受管仓库运行
-`docsite.py navcheck --all`，红即契约被破坏。
+`.github/workflows/navcheck.yml` 每周及相关文件变更时，对清单中的仓库运行 `navcheck --all`。检查失败时，先看日志中的规则名和文件路径。
 
-> `docsite.py navcheck --all` 全绿，表示所有受管仓库满足 canonical 导航结构约束；
-> 任何结构性例外必须由仓库通过 `.docsite.json` 显式声明，checker 不允许静默兼容。
+## 固定文件名
 
-## 特殊规范文件
-
-沿用「机器生成 / 合规 / 行业约定文件」例外：`CHANGELOG.md`、`LICENSE`、
-`THIRD_PARTY_NOTICES.md`、`SECURITY.md` 等的 canonical path 不因导航或语言目录规约被机械移动；
-如需导航，直接链接即可。
+`CHANGELOG.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`SECURITY.md` 保留原路径，需要导航时直接链接。命名说明见[文件规范](/CONVENTIONS.md)。

@@ -27,7 +27,7 @@ export default {
           "link": "/CONVENTIONS"
         },
         {
-          "text": "导航契约",
+          "text": "导航规则",
           "link": "/NAVIGATION"
         },
         {
@@ -63,7 +63,7 @@ export default {
           "link": "/en/CONVENTIONS"
         },
         {
-          "text": "Navigation Contract",
+          "text": "Navigation Rules",
           "link": "/en/NAVIGATION"
         },
         {

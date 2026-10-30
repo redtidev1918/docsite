@@ -14,15 +14,17 @@ python3 /tmp/docsite/docsite.py build
 python3 /tmp/docsite/docsite.py preview
 ```
 
-Update refreshes package.json/lock, config.mts, generated sidebar, docs.yml, public/.nojekyll and download-page tooling, and adds missing ignore entries. It never changes user Markdown, including `_sidebar.md`. Edit `.docsite.json` and sidebar sources, not generated files.
+Update replaces package.json/lock, config.mts, generated sidebar, docs.yml, public/.nojekyll and download-page scripts, and adds missing ignore entries. It leaves page Markdown and `_sidebar.md` unchanged. Edit `.docsite.json` for site settings and `_sidebar.md` for navigation.
 
-**Existing Node projects:** the root package.json and lock are replaced by managed templates. Non-managed files are backed up before takeover; numbered backups preserve earlier copies. Manually merge application scripts, dependencies and lockfile during PR review. Custom fields currently produce DRIFT under the byte-for-byte check and are replaced by subsequent updates. Evaluate this limitation before adopting docsite in a complex Node project.
+For existing Node projects, docsite replaces the root package.json and lock. It backs up non-managed files first, adding a number if a backup already exists.
+
+Merge any application scripts, dependencies and lockfile changes you need to keep, then install and build. Custom fields will produce DRIFT in check and will be replaced by the next update. The current version cannot preserve an existing Node project's package configuration automatically; check this before adopting it.
 
 For dependency upgrades, change the template's pinned package version, run `npm install` in template/ to update its lock, then run update and npm ci in each target. After manually merging dependencies, run npm install to regenerate the target lock. V2 update automatically synchronizes engineVersion/version in .docsite.json.
 
-## Explicit Docsify migration
+## Migrate from Docsify
 
-Commit or separately preserve current work first. Until migration, v1 remains supported by update/check/navcheck and is never silently switched to VitePress.
+Commit or save current changes first. Existing sites can keep using v1 update/check/navcheck. Only migrate switches the engine to VitePress.
 
 ```bash
 python3 /tmp/docsite/docsite.py migrate --dry-run
@@ -45,7 +47,7 @@ After build, preview and deployment succeed, remove legacy shells, vendor files 
 
 For an unmerged PR, discard only tracked changes belonging to the migration and restore any previously uncommitted files from backups. Inspect and remove newly generated untracked files individually; git checkout alone does not remove them. For a merged migration, create a revert commit and restore the old workflow. Keep only one Pages deployment active.
 
-Validate docsite after its PR merges, then migrate one business repository as a pilot. Verify the real release → commit → dispatch → Pages flow before proceeding to PixivFlow, DAViewer and TelePost one at a time. Each repository gets an independent PR; never automatically merge or migrate in bulk.
+When migrating several repositories, start with one. Check the live pages and the release → commit → dispatch → Pages flow before moving on. Submit a separate PR for each repository.
 
 ## Template sources and checks
 
