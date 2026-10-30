@@ -30,14 +30,22 @@ jobs:
     steps:
       - name: Checkout docsite
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Clone managed repositories
+        env:
+          # 优先使用仅授权受检仓库 contents:read 的专用 token。
+          # 兼容现有账号级 token；单仓库 GITHUB_TOKEN 无法读取其它私有仓库。
+          GH_TOKEN: ${{ secrets.NAVCHECK_REPOS_TOKEN || secrets.PROFILE_REPO_TOKEN || github.token }}
         run: |
+          gh auth setup-git --hostname github.com
           mkdir -p repos
           for r in PixivFlow pixiv-token-getter pixivflow-telepost-deploy TelePost \
-                   dakit telepress pixivflow-webui paranote ludum graf \
-                   deviantdrop deviantart-downloader daviewer NekoTime releasegraph \
-                   release-infra docsite; do
+                   DAKit TelePress pixivflow-webui ParaNote ludum Graf \
+                   DeviantDrop deviantart-downloader DAViewer NekoTime releasegraph \
+                   docsite; do
+            echo "Checking out redtidev1918/$r"
             git clone --quiet --depth 1 "https://github.com/redtidev1918/$r" "repos/$r"
           done
 
