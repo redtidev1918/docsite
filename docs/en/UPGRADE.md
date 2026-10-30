@@ -14,7 +14,7 @@ python3 /tmp/docsite/docsite.py build
 python3 /tmp/docsite/docsite.py preview
 ```
 
-Update refreshes package.json/lock, config.mts, generated sidebar, docs.yml, public/.nojekyll and download-page tooling, and adds missing ignore entries. It never changes user Markdown, including `_sidebar.md`. Edit `.docsite.json` and sidebar sources, not generated files.
+Update replaces package.json/lock, config.mts, generated sidebar, docs.yml, public/.nojekyll and download-page scripts, and adds missing ignore entries. It leaves page Markdown and `_sidebar.md` unchanged. Edit `.docsite.json` for site settings and `_sidebar.md` for navigation.
 
 For an existing Node project, set `"packageMode": "merge"` in .docsite.json, or use `init --package-mode merge`. Update adds docs:* scripts and the pinned VitePress devDependency while keeping application fields and the original lock. Run `npm install` afterwards to update the lock. A different existing docs:* command causes an error and must be merged manually.
 
@@ -22,9 +22,9 @@ The default managed mode replaces the whole package.json/lock from templates and
 
 For dependency upgrades, change the template's pinned package version, run `npm install` in template/ to update its lock, then run update and npm ci in each target. After manually merging dependencies, run npm install to regenerate the target lock. V2 update automatically synchronizes engineVersion/version in .docsite.json.
 
-## Explicit Docsify migration
+## Migrate from Docsify
 
-Commit or separately preserve current work first. Until migration, v1 remains supported by update/check/navcheck and is never silently switched to VitePress.
+Commit or save current changes first. Existing sites can keep using v1 update/check/navcheck. Only migrate switches the engine to VitePress.
 
 ```bash
 python3 /tmp/docsite/docsite.py migrate --dry-run
@@ -47,7 +47,7 @@ After build, preview and deployment succeed, remove legacy shells, vendor files 
 
 For an unmerged PR, discard only tracked changes belonging to the migration and restore any previously uncommitted files from backups. Inspect and remove newly generated untracked files individually; git checkout alone does not remove them. For a merged migration, create a revert commit and restore the old workflow. Keep only one Pages deployment active.
 
-Validate docsite after its PR merges, then migrate one business repository as a pilot. Verify the real release → commit → dispatch → Pages flow before proceeding to PixivFlow, DAViewer and TelePost one at a time. Each repository gets an independent PR; never automatically merge or migrate in bulk.
+When migrating several repositories, start with one. Check the live pages and the release → commit → dispatch → Pages flow before moving on. Submit a separate PR for each repository.
 
 ## Template sources and checks
 

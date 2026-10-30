@@ -4,5 +4,5 @@
   - [快速开始](/QUICKSTART.md)
 - 规范
   - [文件与命名规范](/CONVENTIONS.md)
-  - [导航契约](/NAVIGATION.md)
+  - [导航规则](/NAVIGATION.md)
   - [升级模板](/UPGRADE.md)

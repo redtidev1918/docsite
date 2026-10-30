@@ -2,24 +2,24 @@
 
 **语言 / Language:** 中文 · [English](/en/CONVENTIONS.md)
 
-docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的文档以它为准。
+这份文档说明 docsite 的文件布局、命名和下载页配置。
 
-## 文件管辖与构建
+## 文件由谁维护
 
-VitePress 引擎使用 Node.js 22+ 与 npm ci；Python 标准库管理层负责模板、检查和迁移。
+Python 脚本更新配置和检查文件，VitePress 构建网站。构建前需要 Node.js 22+ 和 `npm ci`。
 
 | 类别 | 文件 | 更新规则 |
 | :-- | :-- | :-- |
-| 托管依赖 | package.json / package-lock.json | 按模板下发，Node 工程的自定义字段须人工合并 |
+| 托管依赖 | package.json / package-lock.json | 默认按模板下发；packageMode: merge 保留 Node 工程字段 |
 | 托管渲染 | docs/.vitepress/config.mts、.github/workflows/docs.yml | 从 .docsite.json 渲染 |
 | 托管生成 | docs/.vitepress/sidebar.generated.mjs | 从两种语言的 _sidebar.md 生成 |
 | 托管复制 | docs/public/.nojekyll、下载页生成器/workflow | update 同步 |
-| 用户内容 | docs/*.md、docs/en/*.md（含 _sidebar.md） | update 永不覆盖；init 只创建缺失骨架 |
-| 仓库配置 | .docsite.json、.github/scripts/download-page.json | 用户维护；migrate 显式升级字段并备份 |
+| 用户内容 | docs/*.md、docs/en/*.md（含 _sidebar.md） | update 不覆盖；init 只创建缺失的示例页 |
+| 仓库配置 | .docsite.json、.github/scripts/download-page.json | 自己维护；migrate 升级字段前会备份 |
 
-README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md` 不作为页面发布。无需自制 index.html、vendor 或自定义主题。旧模板仍仅用于未 migrate 的 v1 仓库。
+README.md 与 en/README.md 发布为 `/` 与 `/en/`；`_sidebar.md` 只用于生成导航，不作为页面发布。尚未迁移的 v1 仓库继续使用旧 Docsify 模板。
 
-`.docsite.json` 顶层接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode；未知字段与错误类型拒绝。packageMode 可设 managed（默认，整体托管依赖文件）或 merge（保留已有 Node 项目，只合并 docs scripts 与 VitePress 依赖）。v1 字段可缺省，navigation 的两个布尔例外见[导航契约](/NAVIGATION.md)。
+`.docsite.json` 顶层接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode；未知字段和错误类型会报错。packageMode 可设 managed（默认，整体托管依赖文件）或 merge（保留已有 Node 项目，只合并 docs scripts 与 VitePress 依赖）。旧配置缺少的字段会使用默认值，navigation 的两个开关见[导航规则](/NAVIGATION.md)。
 
 ## 语言与文件命名
 
@@ -30,8 +30,8 @@ README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md`
 | 文档站正文 | `docs/<PAGE>.md` | `docs/en/<PAGE>.md` |
 | 下载页 | `docs/download.md` | `docs/en/download.md` |
 
-- **中文是默认语言**：`README.md`、`docs/README.md` 一律写中文
-- **英文统一用 `.en.md` 点号后缀**，禁止 `README_EN.md`、`README_CN.md`、`README.zh-CN.md`
+- 中文是默认语言，写在 `README.md` 和 `docs/README.md`
+- 仓库根的英文 README 用 `README.en.md`，不使用 `README_EN.md`、`README_CN.md` 或 `README.zh-CN.md`
 - 文档站内不再用 `*.zh-CN.md` / `*.en.md` 后缀或 `docs/zh-CN/` 目录：中英分别由
   `docs/` 与 `docs/en/` 两个平行目录承载，同名页一一对应
 - README 顶部加语言切换行（根 README 指向 `README.en.md`）：
@@ -40,24 +40,15 @@ README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md`
   **语言 / Language:** 中文 · [English](README.en.md)
   ```
 
-## 明确例外：机器生成 / 合规 / 行业约定文件
+## 保留原名的文件
 
-命名规范只约束 **README 与人工维护的 docs 内容**。机器生成、行业约定或合规类文件
-（`CHANGELOG.md`、`THIRD_PARTY_NOTICES.md`、`LICENSE`、`SECURITY.md` 等受工具链约束的
-文件）**保留 canonical 文件名和原始语言**；翻译副本可用 `.zh-CN.md` / `.en.md`。
+上面的命名约定用于 README 和手写文档。`CHANGELOG.md`、`THIRD_PARTY_NOTICES.md`、`LICENSE`、`SECURITY.md` 等文件保留原名和原始语言，翻译副本可用 `.zh-CN.md` / `.en.md`。
 
-**不得为了命名统一破坏生成器、包管理器或合规工具链。**
+例如 Graf 的英文 `CHANGELOG.md` 由 release-please 维护，中文翻译另存为 `CHANGELOG.zh-CN.md`。包管理器、许可证扫描器或 GitHub 按固定路径读取的文件也按此处理。
 
-- 现存特例：`Graf` 的 `CHANGELOG.md` 由 release-please 自动维护（英文、标准文件名），
-  `CHANGELOG.zh-CN.md` 是中文翻译副本；`THIRD_PARTY_NOTICES.md` 同理。
-  这是有意保留的特例，不是技术债；强行把中文设为主文件会让 release-please
-  反向破坏发布自动化，任何「清理」这类文件的 PR 都应拒绝。
-- 判定口径：若一个文件的「正确文件名」由某个工具（release-please、许可证扫描器、
-  GitHub 内置功能）按字面约定读取，它就属于本例外；只有纯给人看的页面才受命名规范约束。
+## 下载页
 
-## 下载页生成链路（托管）
-
-下载页由 docsite 统一下发，**不要各仓库自己写、也不要手改**：
+`update` 会同步以下文件。项目自己的配置放在 download-page.json，避免修改脚本后被覆盖。
 
 | 文件 | 作用 |
 | :-- | :-- |
@@ -71,12 +62,7 @@ README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md`
 # docsite-managed-version: 1
 ```
 
-**为什么要托管**：此前 6 个仓库各存一份手改副本，行数 146–149、md5 全不相同，而且
-**没有任何 workflow 真正调用它**。结果是下载页上「本页由 GitHub Actions 在每次发版时
-自动更新」是假的，页面长期停在旧版本（例：仓库已发 v1.12.0，页面还写着 v1.11.0）。
-托管后只维护一份，`update` 统一下发。
-
-### 按仓库自定义（非托管文件，`update` 不覆盖）
+### 项目配置
 
 路径固定为 `.github/scripts/download-page.json`：
 
@@ -96,10 +82,9 @@ README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md`
 - `trackPrerelease`：默认 `false`，pre-release 不覆盖 stable 页面
 - `docsWorkflow`：刷新 workflow 提交后要 dispatch 的 Pages workflow 名，默认 `docs.yml`
 
-### 精确 tag 与机器校验
+### 指定版本和检查更新
 
-ReleaseGraph post-release action 用这个能力下传 exact tag，不依赖 `release: published`
-事件，因为 GITHUB_TOKEN 创建的 Release 不会级联触发事件：
+ReleaseGraph 可以传入具体 tag。使用 GITHUB_TOKEN 创建 Release 时，需要主动调用 workflow，不能依赖 `release: published` 触发后续任务。
 
 ```bash
 python3 .github/scripts/update_download_page.py owner/project --tag v1.2.3   # 精确版本
@@ -107,43 +92,37 @@ python3 .github/scripts/update_download_page.py owner/project --language en  # �
 python3 .github/scripts/update_download_page.py owner/project --check        # 页面 tag vs 最新 stable
 ```
 
-每个生成页带机器可读 marker（`<!-- docsite-release-tag: v1.2.3 -->`），`--check` 据此报告
-`OK / STALE / MISSING / DRIFT`；**stale-write 防护**保证晚到的旧 tag runner 不会把已指向
-新版本的页面回退（`--force` 可显式覆盖）。刷新 workflow 用 `workflow_dispatch`（`tag` 输入）
-加 `release: published` 兜底，并在提交成功后显式 dispatch 文档站 workflow
-（GITHUB_TOKEN 的 push 不会触发 push 型部署）。
+生成页会记录 tag，如 `<!-- docsite-release-tag: v1.2.3 -->`。`--check` 返回 `OK / STALE / MISSING / DRIFT`。旧 tag 的任务晚到时不会覆盖较新的页面，除非使用 `--force`。
+
+更新 workflow 支持 `workflow_dispatch` 的 tag 输入和 `release: published`。提交下载页后，它会主动触发文档构建，因为 GITHUB_TOKEN 的 push 不会触发 push 型部署。
 
 ### 下载页内容约定
 
 每个仓库都要有 `docs/download.md` 与 `docs/en/download.md`：
 
 - 有二进制产物：按平台列表格，链接用 `releases/latest/download/<asset>`，并列出 `SHA256SUMS`
-- 只有包管理器产物（npm / PyPI / Cloudflare Worker）：不编造二进制链接，改列安装命令与注册表入口
+- 通过 npm、PyPI 或 Cloudflare Worker 发布：列出安装命令与注册表入口
 - 页面顶部给 Releases 与 CHANGELOG 链接
 
 ## 部署 workflow
 
 v2 生成 `.github/workflows/docs.yml`：Node 22 → npm ci → npm run docs:build → 上传 docs/.vitepress/dist → Pages。要求：
 
-- 只保留**一个** Pages 部署 workflow，避免重复部署
+- 只保留一个 Pages 部署 workflow，避免重复部署
 - 触发分支与 `.docsite.json` 的 `branch` 一致
 - `public/.nojekyll` 保留在 dist；根级 Markdown 不会自动纳入站点
 
-已做防护：`init` / `update` 发现同一目录已有其它 Pages 部署 workflow（如历史 `static.yml`）
-时，**会跳过托管 `docs.yml`**，不会制造第二个部署流程。
+`init` / `update` 发现其它 Pages workflow（如 static.yml）时，会跳过 docs.yml。
 
-迁移时旧 static.yml 会被备份停用，且报告额外拷贝目录；如其承担其它发布用途，先人工拆分。release workflow 提交下载页后显式 dispatch docs.yml；GITHUB_TOKEN 的 push 不会自行触发 push 型部署。
+迁移时旧 static.yml 会被备份并停用。迁移报告会列出它额外拷贝的目录；如果还要发布这些内容，需要单独处理。
 
-### Actions 版本的单一事实源
+### 更新 Actions 版本
 
-v2 使用 `template/.github/workflows/docs.yml`，v1 兼容模板为 `template/docs.yml`。升级时改对应模板，
-再由各仓库运行 `python3 docsite.py update` 收敛。不要在单个仓库里手改：`docs.yml` 是托管
-文件，下次 `update` 会把改动覆盖回模板版本，于是同一份版本号在仓库间反复漂移。
+v2 的模板是 `template/.github/workflows/docs.yml`，v1 的模板是 `template/docs.yml`。修改对应模板，再到各仓库运行 `update`。直接修改生成的 docs.yml 会被下次 update 覆盖。
 
 ## 包管理器页面（npm / PyPI）
 
-**不为注册表页面制造例外。** 统一规则只有一条：`README.md` 永远是中文默认，第一屏给出
-English 入口。
+npm 和 PyPI 页面沿用中文 README，开头放英文链接。
 
 | 面 | 语言 |
 | :-- | :-- |
@@ -152,6 +131,4 @@ English 入口。
 | PyPI 项目页（`pyproject.toml` 的 `readme`） | 继续指向 `README.md` |
 | `description` / `keywords` | 英文（面向检索的元数据，与正文语言不冲突） |
 
-不建议把 `pyproject.toml` 的 `readme` 指向 `README.en.md`：那会让「GitHub 中文、PyPI 英文、
-npm 中文」，规则反而多了一条。若日后确实要把 registry-facing docs 做成英文，应当单独设计
-npm 的 publish staging，而不是在每个仓库零散加特例。
+`pyproject.toml` 的 `readme` 继续指向 README.md。若包页面需要英文介绍，在发布流程中另行处理。

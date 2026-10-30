@@ -24,6 +24,22 @@
 - **验证:** 新增3个回归测试先对旧实现失败,修复后全量63例通过(1 skip)。依赖此修复后才提交 DAViewer 迁移 PR,不让试点丢失英文安装说明/截图。
 - **试点选择:** PixivFlow 有完整 Node 工作区且旧壳无托管标记,不冒险覆盖业务 package。首站改为没有根 Node 包冲突的 DAViewer;PixivFlow 留待包配置兼容策略明确后处理。DAViewer 71份原文档和旧壳保留,旧部署配置备份停用,使用显式人工接入(不伪造托管标记)。
 
+## 2026-10-30 · 文档措辞清理
+
+- **用户要求:** 降低 docsite 文档的 AI 味道。使用本机 no-ai-slop 技能审读全部公开中英文说明。
+- **改动:** README、站内首页、快速开始、文件规范、导航、升级和获取页改用具体步骤与文件说明;删掉口号、反复强调规则的段落、内部迁移计划和多余的小标题。中英文同步,导航标题改为“导航规则 / Navigation Rules”并重新生成 sidebar。
+- **保留:** Node 22/npm ci、托管文件覆盖范围、Node 工程 package.json 冲突、迁移备份、旧站兼容、下载页触发方式和回滚步骤。未修改 CLI、模板或下载页生成器。
+- **验证:** VitePress 构建通过,无 .git 副本 check 9/9 与 navcheck 通过。34 个代码块的命令/配置与改写前相同(只改了两条注释)。真实浏览器抽查中英首页及移动端规范/导航/升级页,无整体横向滚动;已查看截图。
+- **前一项进度:** 导航鉴权修复在 [PR #12](https://github.com/redtidev1918/docsite/pull/12),完整16仓库 navcheck 与 PR CI 均通过,待审查合并。
+
+## 2026-10-30 · docsite 合并上线与导航鉴权修复
+
+- **上线:** 用户明确要求“合并上线”,PR #11 合并为 d435f6a。main 的 Validate 与 Pages CI 均成功;线上中英首页/QUICKSTART/download 六路由均 200,搜索与 390px 暗色正常、无整体横向滚动或资源错误。
+- **故障原因:** 跨仓库 navcheck 使用匿名 clone,遇到私有 ParaNote/ludum/Graf 即鉴权失败;旧 release-infra 名称还会重定向到已在清单中的 releasegraph。
+- **修复:** Checkout 不持久化单仓库凭据;clone 使用 gh auth setup-git,优先 NAVCHECK_REPOS_TOKEN(建议只授权受检仓库 contents:read),兼容现有 PROFILE_REPO_TOKEN,最后才回落 github.token。保留错误即失败,不跳过受检仓库。规范大小写并去掉重复的旧仓库别名。
+- **验证:** 修复分支的 [真实 CI](https://github.com/redtidev1918/docsite/actions/runs/41081870162) 成功,私有仓库均克隆成功且 navcheck 全绿;没有增加/导出凭据或修改仓库权限。
+- **下一步:** 修复 PR 待审查;六站重建继续遵守先试点、逐仓库独立 PR。
+
 ## 2026-10-30 · 阶段 5 本仓库交付准备与六站重建范围
 
 - **交付:** 分支已推送,[PR #11](https://github.com/redtidev1918/docsite/pull/11) 已创建,未合并。GitHub connector 创建 PR 返回 integration 403,使用本机已授权 gh 完成创建。

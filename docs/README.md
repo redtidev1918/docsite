@@ -2,33 +2,28 @@
 
 **语言 / Language:** 中文 · [English](/en/)
 
-轻量级开源项目文档网站生成器：VitePress 引擎 + Python 工程管理层 + GitHub Pages 托管。
+docsite 给 GitHub 仓库生成文档站。正文放在 `docs/`，用 VitePress 构建，再由 GitHub Actions 发布到 Pages。
 
 需要 Python 3、Node.js 22+ 和 npm；先 `npm ci`，再 `npm run docs:build`。
 
-- [快速开始](/QUICKSTART.md)：三分钟把站点接到一个仓库上
-- [📥 获取](/download.md)：没有安装包，就一个 `.py` 文件
+- [快速开始](/QUICKSTART.md)：初始化、构建和部署
+- [获取 docsite](/download.md)：克隆源码或固定版本
 - [文件与命名规范](/CONVENTIONS.md)：中英目录、下载页生成链路
-- [导航契约](/NAVIGATION.md)：侧边栏和语言目录的硬规则
-- [升级模板](/UPGRADE.md)：模板更新后各仓库怎么收敛
+- [导航规则](/NAVIGATION.md)：侧边栏写法和检查项
+- [升级模板](/UPGRADE.md)：更新配置、迁移旧站和回滚
 
 GitHub 仓库：<https://github.com/redtidev1918/docsite>
 
-## 它解决什么
+## 日常维护
 
-统一各仓库的配置、构建部署与下载页自动更新。主题、渲染、本地搜索、亮暗和语言切换由 VitePress 提供，Markdown 留在各仓库。
+平时直接改 Markdown。侧边栏改完后运行 `update`，再构建预览。发版时，workflow 会根据 Release 数据更新下载页，并触发站点重建。
 
-## 设计取舍
+## 哪些文件会被更新
 
-| 选择 | 原因 |
+| 文件 | 维护方式 |
 | :-- | :-- |
-| Python 标准库管理层 | 初始化、升级、检查和迁移无需 Python 第三方依赖；构建需要 Node 22+ 与 npm ci |
-| 默认 VitePress 引擎 | 依赖锁、config、sidebar 和 workflow 托管；正文与 _sidebar.md 永不被 update 覆盖 |
-| 不下发内容 | 下载页是唯一的例外：它由 release 数据生成，手写必然过期 |
-| 不做批量升级 | 每个仓库各跑一次 `update`，diff 可见可控 |
+| 正文、_sidebar.md | 自己编辑，update 不覆盖 |
+| package.json/lock、VitePress 配置、生成的 sidebar、workflow | update 按模板重写 |
+| 下载页 | 发版 workflow 根据 Release 数据生成 |
 
-## 非目标
-
-- 双语页面由 VitePress locales 和独立侧边栏组织，首页仍写在 README.md
-- 不做服务端搜索、不做自定义主题系统
-- 不内置「一键批量升级所有仓库」
+网站使用 VitePress 默认主题，支持亮暗切换、本地搜索和中英文页面。docsite 不提供自定义主题或服务端搜索。
