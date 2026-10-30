@@ -1,0 +1,31 @@
+name: Validate documentation generator
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: python -m unittest discover -s tests
+      - run: npm ci
+      - run: npm run docs:build
+      - name: Check generated files without feature-branch skip
+        run: |
+          cp -R docs .github .docsite.json .gitignore package.json package-lock.json "$RUNNER_TEMP/"
+          python docsite.py check "$RUNNER_TEMP"
+          python docsite.py navcheck "$RUNNER_TEMP"

@@ -1,10 +1,12 @@
 # docsite
 
-**语言 / Language:** 中文 · [English documentation](https://redtidev1918.github.io/docsite/#/en/README.md)
+**语言 / Language:** 中文 · [English](README.en.md)
 
-零依赖的 docsify 文档站脚手架。一个 Python 脚本加一份模板，给 GitHub 仓库配上统一风格的文档站。
+轻量级开源项目文档网站生成器：VitePress 负责渲染、默认主题、搜索与多语言，Python CLI 负责初始化、升级、检查、迁移与下载页，GitHub Pages 负责托管。
 
-线上示例：[PixivFlow](https://redtidev1918.github.io/PixivFlow/) · [DAKit](https://redtidev1918.github.io/DAKit/) · [DAViewer](https://redtidev1918.github.io/DAViewer/) · [TelePost](https://redtidev1918.github.io/TelePost/) · [ReleaseGraph](https://redtidev1918.github.io/releasegraph/) · [docsite](https://redtidev1918.github.io/docsite/)
+前提：Python 3、Node.js 22+ 和 npm。Python 管理层仅用标准库；网站通过 `npm ci` 安装锁定依赖并构建。
+
+站点：[docsite](https://redtidev1918.github.io/docsite/)。下游旧站仍可使用 Docsify；迁移须逐仓库执行并审查独立 PR。
 
 ## 从哪开始
 
@@ -15,7 +17,7 @@
 | 只改文档内容 | 直接编辑 `docs/*.md`，推送到 `main` |
 | 更新模板或托管 workflow | [升级模板](docs/UPGRADE.md) |
 
-docsite 只管外壳和部署链路，Markdown 留在仓库里。正文、侧边栏结构和技术文档都不会被模板升级覆盖。
+Markdown 留在业务仓库里，`update` 永不覆盖正文或 `_sidebar.md`。侧边栏由 `_sidebar.md` 生成，不手工维护第二份配置。
 
 ## 快速开始
 
@@ -28,6 +30,9 @@ python3 /tmp/docsite/docsite.py init \
   --name 显示名 \
   --emoji 📘 \
   --branch main
+npm ci
+python3 /tmp/docsite/docsite.py build
+python3 /tmp/docsite/docsite.py preview
 ```
 
 推送到远程后，GitHub Actions 会发布 Pages。首次部署需要在仓库 `Settings → Pages` 里确认 Source 是 GitHub Actions。
@@ -44,8 +49,11 @@ https://<owner>.github.io/<name>/
 
 ```text
 .docsite.json
+package.json / package-lock.json
 docs/
-├── index.html
+├── .vitepress/config.mts
+├── .vitepress/sidebar.generated.mjs
+├── public/.nojekyll
 ├── _sidebar.md
 ├── README.md
 ├── QUICKSTART.md
@@ -56,15 +64,15 @@ docs/
 .github/scripts/update_download_page.py
 ```
 
-Markdown 由仓库自己维护；`index.html`、部署 workflow 和 vendor 资源由模板托管，不要手改。
+Markdown 由仓库自己维护；依赖清单、VitePress 配置、生成的 sidebar 和部署链路由模板托管。已有 Node 工程的 scripts/依赖需要在 PR 中人工合并，详见[升级指南](docs/UPGRADE.md)。
 
 ## 日常使用
 
 1. 往 `docs/` 增加或修改 `.md` 文件。
 2. 在 `docs/_sidebar.md` 中用根绝对路径加入口，例如 `- [架构](/ARCHITECTURE.md)`。
-3. 推送到默认分支，等 Actions 完成后刷新 Pages。
+3. 修改侧边栏后运行 `python3 /tmp/docsite/docsite.py update`，再构建预览并推送。
 
-下载页不用手写。发版后由 `.github/workflows/update-download-page.yml` 根据 Release 数据刷新。旧仓库已有 `docs/` 时，`init` 会先备份非托管文件，不会静默覆盖正文。
+下载页由 `.github/workflows/update-download-page.yml` 根据 Release 数据刷新，并显式 dispatch `docs.yml` 重建。旧 Docsify 站点先运行 `migrate --dry-run`，再按[升级指南](docs/UPGRADE.md)迁移。
 
 ## 质量检查
 
@@ -74,11 +82,11 @@ python3 docsite.py navcheck .
 python3 docsite.py update
 ```
 
-`check` 用于发现下载页过期或漂移；`navcheck` 检查侧边栏、语言目录、重复链接和锚点；`update` 只收敛托管文件，不会改 Markdown。
+`check` 校验托管文件、依赖锁、配置和下载页链路；`navcheck` 校验导航与生成 sidebar 一致性。下载页内容版本通过生成器的 `--check` 单独核对。
 
 ## 非目标
 
-docsite 不做按语言自动跳转的路由、服务端搜索或自定义主题系统。批量升级也不做成“一键全仓”，每个仓库自己跑 `update`，diff 可见可控。
+不维护自定义主题、服务端搜索或外部搜索服务；使用 VitePress 默认主题和本地搜索。每个仓库独立升级、独立 PR，不自动合并。
 
 ## 许可
 

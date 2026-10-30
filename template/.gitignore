@@ -1,0 +1,4 @@
+# docsite: managed file, run `python3 docsite.py update` to refresh.
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

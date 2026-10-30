@@ -1,8 +1,25 @@
 # 文件与命名规范
 
-**语言 / Language:** 中文 · [English](/en/)
+**语言 / Language:** 中文 · [English](/en/CONVENTIONS.md)
 
 docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的文档以它为准。
+
+## 文件管辖与构建
+
+VitePress 引擎使用 Node.js 22+ 与 npm ci；Python 标准库管理层负责模板、检查和迁移。
+
+| 类别 | 文件 | 更新规则 |
+| :-- | :-- | :-- |
+| 托管依赖 | package.json / package-lock.json | 按模板下发，Node 工程的自定义字段须人工合并 |
+| 托管渲染 | docs/.vitepress/config.mts、.github/workflows/docs.yml | 从 .docsite.json 渲染 |
+| 托管生成 | docs/.vitepress/sidebar.generated.mjs | 从两种语言的 _sidebar.md 生成 |
+| 托管复制 | docs/public/.nojekyll、下载页生成器/workflow | update 同步 |
+| 用户内容 | docs/*.md、docs/en/*.md（含 _sidebar.md） | update 永不覆盖；init 只创建缺失骨架 |
+| 仓库配置 | .docsite.json、.github/scripts/download-page.json | 用户维护；migrate 显式升级字段并备份 |
+
+README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md` 不作为页面发布。无需自制 index.html、vendor 或自定义主题。旧模板仍仅用于未 migrate 的 v1 仓库。
+
+`.docsite.json` 顶层仅接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation；未知字段与错误类型拒绝。v1 字段可缺省，navigation 的两个布尔例外见[导航契约](/NAVIGATION.md)。
 
 ## 语言与文件命名
 
@@ -73,11 +90,8 @@ docsite 生成的结构默认遵循下面这套约定，账号下所有仓库的
 
 - `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
 - `previewFile`：手写预览片段，存在时注入第一语言页（默认中文，放应用截图等）
-- `linkBase`：页面内互链的站点路径前缀。默认 `""`（Pages 直接上传 `./docs`，`docs/` 就是
-  站点根）；若仓库用「拼接 `_site`」模式并把 `docs/` 作为子目录发布，填 `"/docs"`，
-  否则两语言互链会 404
-- `languages` / `outputs`：默认 `["zh","en"]` 与固定路径；只出中文、只出英文、
-  自定义路径都可行
+- `linkBase`：v2 使用 `""`，由 VitePress base 处理仓库子路径；`"/docs"` 仅适用于旧 v1 拼接发布，迁移时会清空
+- `languages` / `outputs`：默认 `["zh","en"]` 与固定路径；自定义路径必须同时满足页面互链与导航，缺翻译页时构建会因 dead link 失败
 - `trackPrerelease`：默认 `false`，pre-release 不覆盖 stable 页面
 - `docsWorkflow`：刷新 workflow 提交后要 dispatch 的 Pages workflow 名，默认 `docs.yml`
 
@@ -108,21 +122,20 @@ python3 .github/scripts/update_download_page.py owner/project --check        # �
 
 ## 部署 workflow
 
-`docsite init` 生成 `.github/workflows/docs.yml`。早期接入的仓库沿用了 GitHub 默认模板名
-`static.yml`。**两者内容等价，不要为了统一而改名**（改名会打断 Pages 的部署环境与权限绑定）。
-要求：
+v2 生成 `.github/workflows/docs.yml`：Node 22 → npm ci → npm run docs:build → 上传 docs/.vitepress/dist → Pages。要求：
 
 - 只保留**一个** Pages 部署 workflow，避免重复部署
 - 触发分支与 `.docsite.json` 的 `branch` 一致
-- 若 workflow 采用「拼接 `_site`」模式（拷贝根级 `*.md` 而非上传 `./docs`），
-  新增的 `docs/en/` 页面需确认已被纳入拷贝范围
+- `public/.nojekyll` 保留在 dist；根级 Markdown 不会自动纳入站点
 
 已做防护：`init` / `update` 发现同一目录已有其它 Pages 部署 workflow（如历史 `static.yml`）
 时，**会跳过托管 `docs.yml`**，不会制造第二个部署流程。
 
+迁移时旧 static.yml 会被备份停用，且报告额外拷贝目录；如其承担其它发布用途，先人工拆分。release workflow 提交下载页后显式 dispatch docs.yml；GITHUB_TOKEN 的 push 不会自行触发 push 型部署。
+
 ### Actions 版本的单一事实源
 
-`template/docs.yml` 是**全账号 actions 版本的唯一来源**。升级时只改这一处模板，
+v2 使用 `template/.github/workflows/docs.yml`，v1 兼容模板为 `template/docs.yml`。升级时改对应模板，
 再由各仓库运行 `python3 docsite.py update` 收敛。不要在单个仓库里手改：`docs.yml` 是托管
 文件，下次 `update` 会把改动覆盖回模板版本，于是同一份版本号在仓库间反复漂移。
 

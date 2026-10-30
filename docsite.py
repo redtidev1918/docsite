@@ -1,23 +1,31 @@
 #!/usr/bin/env python3
-"""docsite — 一行依赖都没有的 docsify 文档站脚手架。
+"""docsite — 轻量级文档网站生成器:VitePress 管渲染,本脚本管工程。
 
     python3 docsite.py init --repo owner/name [--name 名] [--emoji 📘] [--branch main]
     python3 docsite.py update
+    python3 docsite.py migrate [路径] [--dry-run]
+    python3 docsite.py build | preview | dev
     python3 docsite.py check [仓库路径 ...] [--all 父目录]
     python3 docsite.py navcheck [仓库路径 ...] [--all 父目录]
 
-init      在当前仓库生成 docs/（老仓库为 .github/pages/ 外壳）与 Pages 部署 workflow。
-update    只刷新托管文件（index.html / workflow / vendor / 下载页生成链路），
-          永远不动你写的 Markdown。
-check     校验各仓库的「下载页生成链路」是否与模板逐字节一致（缺文件 / 被手改 / 版本落后）。
-navcheck  校验导航信息架构规约（确定性规则：语言侧边栏分离、无页内锚点、
-          无重复链接、en 侧边栏存在；单页面分类等软规则仅 warning）。
+分工:VitePress 管网站(渲染/路由/主题/搜索/导航),docsite 管工程(init/update/
+migrate/build/preview、配置、下载页、质量检查),GitHub Pages 管托管。
 
-统一文档规范：中文为默认（README.md / docs/），英文镜像放 README.en.md / docs/en/；
-语言是站点维度——docs/_sidebar.md 与 docs/en/_sidebar.md 各自只显示当前语言。
-外壳目录自动识别：docs/index.html 存在就是新形态；只有 .github/pages/index.html 的老仓库
-（static.yml 把外壳与 docs/ 拼成 _site）同样由 init/update 托管，vendor 资源跟着外壳走。
-配置存在仓库根的 .docsite.json；模板取自本脚本旁边的 template/ 目录。
+init      接入 VitePress(v2):依赖清单、config、部署 workflow、内容骨架。
+update    只刷新托管文件(package.json/lock、config.mts、sidebar、workflow、下载页链路),
+          永远不动你写的 Markdown。
+migrate   把 docsite 托管的 Docsify 旧形态安全迁移到 v2(备份先行、--dry-run、
+          `#/` hash 链接与壳形态 /docs/ 前缀改写;旧文件清理是构建验证后的独立人工步骤)。
+build/preview/dev   包装 npm run docs:*(渲染交给 VitePress CLI)。
+check     托管文件与模板一致性(下载页链路逐字节;v2 另查依赖/渲染/生成一致性)。
+navcheck  导航信息架构规约(v2 与 v1 双规则表;语言是站点维度、无重复、链接指真实页面)。
+
+统一文档规范:中文为默认(docs/),英文镜像放 docs/en/;语言是站点维度——
+docs/_sidebar.md 与 docs/en/_sidebar.md 各自只显示当前语言;侧边栏只维护
+_sidebar.md,docs/.vitepress/sidebar.generated.mjs 由 update 重新生成。
+配置存在仓库根的 .docsite.json(v2 含 engine/engineVersion);模板取自本脚本
+旁边的 template/ 目录。旧 Docsify 形态(docs/ 或 .github/pages/ 外壳)在
+migrate 之前继续被 update/check/navcheck 支持(向后兼容,D-005)。
 """
 import argparse
 import json
@@ -71,13 +79,204 @@ def render(text, cfg):
             "description",
             f"{cfg['name']} 文档中心。内容直接来自仓库里的 Markdown，与代码同步更新。",
         ),
-        "THEME_KEY": cfg["themeKey"],
+        # v2 配置不再写 themeKey(Docsify 专属);模板用到时给空串
+        "THEME_KEY": cfg.get("themeKey", ""),
         "REPO": cfg["repo"],
-        "BRANCH": cfg["branch"],
+        "BRANCH": cfg.get("branch", "main"),
     }
     def sub(m):
         return tokens[m.group(1)]
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
+
+
+# ---------------------------------------------------------------------------
+# VitePress(v2 引擎)托管文件的渲染与生成。
+# config.mts 的 token 全部处于 JS 单引号字符串上下文,一律转义(D-005:
+# 未校验的用户字符串不得拼进 JS);base 由 repo 推导,不接受配置覆盖。
+VP_CONFIG_REL = Path("docs/.vitepress/config.mts")
+VP_SIDEBAR_REL = Path("docs/.vitepress/sidebar.generated.mjs")
+VP_SIDEBAR_HEADER = (
+    "// docsite: managed file — generated from _sidebar.md, do not edit.\n"
+    "// 导航只维护 docs/_sidebar.md 与 docs/en/_sidebar.md;"
+    "运行 `python3 docsite.py update` 会按它们重新生成本文件。\n"
+)
+
+
+def _js_escape(s):
+    """JS 单引号字符串上下文的最小转义(config.mts 里的 '@@TOKEN@@')。"""
+    return (json.dumps(s, ensure_ascii=False)[1:-1].replace("'", "\\'")
+            .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+
+
+def _base_for(repo):
+    """GitHub Pages 路径:用户/组织站点 <owner>.github.io 部署在根,其余挂 /<repo>/。"""
+    name = repo.split("/")[-1]
+    return "/" if name.endswith(".github.io") else f"/{name}/"
+
+
+def render_config(text, cfg):
+    """渲染 config.mts 模板;token 值先过单引号转义再进模板。"""
+    validate_config(cfg)
+    tokens = {
+        "NAME": cfg["name"],
+        "EMOJI": cfg["emoji"],
+        "DESCRIPTION": cfg.get(
+            "description",
+            f"{cfg['name']} 文档中心。内容直接来自仓库里的 Markdown，与代码同步更新。",
+        ),
+        "REPO": cfg["repo"],
+        "BASE": _base_for(cfg["repo"]),
+    }
+    def sub(m):
+        return _js_escape(tokens[m.group(1)])
+    return re.sub(r"@@([A-Z_]+)@@", sub, text)
+
+
+def _vp_link(target):
+    """Docsify 侧边栏链接 → VitePress 路由:根绝对 .md 去后缀;外部链接原样。"""
+    if target is None or _is_external(target):
+        return target
+    page, _, anchor = target.partition("#")
+    if page.endswith(".md"):
+        page = page[: -len(".md")]
+    return f"{page}#{anchor}" if anchor else page
+
+
+def _vitepress_sidebar(items):
+    """_sidebar_items() 的条目 → VitePress SidebarItem 树。
+
+    规范形态是两级:顶级分类(无链接)成组,其余条目为叶子归入最近的组;
+    更深的层级按同规则嵌套(防御性处理,规范本身不使用)。
+    """
+    root = []
+    stack = [root]
+    for indent, label, target in items:
+        depth = min(indent, len(stack) - 1)
+        del stack[depth + 1:]
+        if target is None:
+            group = {"text": label, "items": []}
+            stack[depth].append(group)
+            stack.append(group["items"])
+        else:
+            stack[depth].append({"text": label, "link": _vp_link(target)})
+    return root
+
+
+def sidebar_module_text(root):
+    """由 docs/_sidebar.md(+ docs/en/_sidebar.md)生成 sidebar.generated.mjs 全文。"""
+    root = Path(root)
+    tree = {}
+    for prefix, rel in (("/", "docs/_sidebar.md"), ("/en/", "docs/en/_sidebar.md")):
+        path = root / rel
+        if path.is_file():
+            tree[prefix] = _vitepress_sidebar(
+                _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")))
+    return (VP_SIDEBAR_HEADER
+            + "export default " + json.dumps(tree, ensure_ascii=False, indent=2) + "\n")
+
+
+def write_sidebars(root="."):
+    """重新生成 docs/.vitepress/sidebar.generated.mjs(init/update 与迁移时调用)。"""
+    root = Path(root)
+    dst = root / VP_SIDEBAR_REL
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    write_file(dst, sidebar_module_text(root), overwrite=True)
+    return dst
+
+
+def is_vitepress(root):
+    """仓库是否已是 VitePress(v2)形态:以 config.mts 在场为准(比配置字段更实在)。"""
+    return (Path(root) / VP_CONFIG_REL).is_file()
+
+
+# v2 托管文件:模板相对路径 → 仓库相对路径。
+# package.json/lock 逐字节下发(无 token),全仓库版本一致;config.mts/docs.yml 渲染。
+V2_MANAGED = {
+    "package.json": Path("package.json"),
+    "package-lock.json": Path("package-lock.json"),
+    ".github/workflows/docs.yml": Path(".github/workflows/docs.yml"),
+}
+GITIGNORE_ENTRIES = ["node_modules/", "docs/.vitepress/dist/", "docs/.vitepress/cache/"]
+
+
+def engine_version():
+    """模板锁定的 VitePress 版本(写进各仓库 .docsite.json 的 engineVersion)。"""
+    pkg = json.loads((TEMPLATE / "package.json").read_text(encoding="utf-8"))
+    return pkg["devDependencies"]["vitepress"]
+
+
+def _ensure_gitignore(root):
+    """把 node/dist/cache 三行补进 .gitignore(已有条目不重复,不覆盖用户内容)。"""
+    gi = Path(root) / ".gitignore"
+    lines = gi.read_text(encoding="utf-8").splitlines() if gi.is_file() else []
+    missing = [e for e in GITIGNORE_ENTRIES if e not in lines]
+    if not missing:
+        return []
+    add = ([""] if lines and lines[-1].strip() else []) + missing
+    with gi.open("a", encoding="utf-8", newline="") as f:
+        f.write("\n".join(add) + "\n")
+    return missing
+
+
+def _write_v2_managed(cfg, root=".", verbose=True):
+    """写入 v2 托管文件(init/update/migrate 共用);用户 Markdown 永不触碰。"""
+    root = Path(root)
+    wrote = []
+    # init/update/migrate 都保护首次接管的文件;已有备份不可被静默覆盖。
+    for rel in list(V2_MANAGED.values()) + [VP_CONFIG_REL, VP_SIDEBAR_REL] + [Path(p) for p in SYNCED.values()]:
+        target = root / rel
+        template_rel = next((tpl for tpl, dst in V2_MANAGED.items() if dst == rel), None)
+        same_template = template_rel and target.is_file() and target.read_bytes() == (TEMPLATE / template_rel).read_bytes()
+        if target.is_file() and not is_managed(target) and not same_template:
+            _backup_file(target)
+    # package.json/lock 逐字节下发(无 token),保证全仓库依赖版本一致
+    for tpl in ("package.json", "package-lock.json"):
+        rel = V2_MANAGED[tpl]
+        write_file(root / rel, (TEMPLATE / tpl).read_text(encoding="utf-8"), overwrite=True)
+        wrote.append(rel)
+
+    # 部署 workflow:同目录已有别的 Pages workflow(如 static.yml)时跳过,避免双部署
+    wf_dst = root / V2_MANAGED[".github/workflows/docs.yml"]
+    other = other_pages_workflow(wf_dst)
+    if other:
+        print(f"  = 已有 Pages workflow {other},跳过托管 {wf_dst}(避免重复部署;"
+              "删除旧 workflow 后重新运行即可下发)")
+    else:
+        src = TEMPLATE / ".github/workflows/docs.yml"
+        write_file(wf_dst, render(src.read_text(encoding="utf-8"), cfg), overwrite=True)
+        wrote.append(V2_MANAGED[".github/workflows/docs.yml"])
+
+    # config.mts 走 JS 转义渲染;sidebar 由 _sidebar.md 重新生成
+    write_file(root / VP_CONFIG_REL,
+               render_config((TEMPLATE / "docs/.vitepress/config.mts").read_text(encoding="utf-8"), cfg),
+               overwrite=True)
+    wrote.append(VP_CONFIG_REL)
+    write_sidebars(root)
+    wrote.append(VP_SIDEBAR_REL)
+    write_file(root / "docs/public/.nojekyll", "", overwrite=True)
+    wrote.append(Path("docs/public/.nojekyll"))
+    for tpl, rel in SYNCED.items():
+        write_file(root / rel, (TEMPLATE / tpl).read_text(encoding="utf-8"), overwrite=True)
+        wrote.append(Path(rel))
+    added_gi = _ensure_gitignore(root)
+
+    if verbose:
+        for rel in wrote:
+            print(f"  ~ {rel}")
+        for entry in added_gi:
+            print(f"  + .gitignore: {entry}")
+        print("  依赖清单已按模板锁定;提交前运行 `npm install`(或 npm ci)同步本地 node_modules")
+    return wrote
+
+
+def _v2_config(cfg):
+    """v2 配置字段:engine/engineVersion 固定,version 升 2(其余字段原样保留)。"""
+    validate_config(cfg)
+    out = dict(cfg)
+    out["engine"] = "vitepress"
+    out["engineVersion"] = engine_version()
+    out["version"] = 2
+    return out
 
 
 def origin_slug():
@@ -91,8 +290,35 @@ def origin_slug():
     return f"{m.group(1)}/{m.group(2)}" if m else None
 
 
+def validate_config(cfg):
+    """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
+    allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
+               "version", "engine", "engineVersion", "navigation"}
+    if not isinstance(cfg, dict):
+        raise ValueError(".docsite.json 必须是对象")
+    unknown = set(cfg) - allowed
+    if unknown:
+        raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
+    for key in allowed - {"version", "navigation"}:
+        if key in cfg and not isinstance(cfg[key], str):
+            raise ValueError(f".docsite.json {key} 必须是字符串")
+    if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
+        raise ValueError("repo 必须是 owner/name")
+    if "branch" in cfg and not re.fullmatch(r"[A-Za-z0-9_./-]+", cfg["branch"]):
+        raise ValueError("branch 含非法字符")
+    if "version" in cfg and (type(cfg["version"]) is not int or cfg["version"] not in (1, 2)):
+        raise ValueError("version 必须是 1 或 2")
+    if "engine" in cfg and cfg["engine"] not in ("docsify", "vitepress"):
+        raise ValueError("engine 必须是 docsify 或 vitepress")
+    nav = cfg.get("navigation", {})
+    if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
+                                         or not isinstance(v, bool) for k, v in nav.items()):
+        raise ValueError("navigation 仅允许 allowSidebarAnchors/allowCombinedLocales 布尔字段")
+
+
 def with_defaults(cfg):
     """补全渲染所需字段；缺失值按 git remote / 仓库名推导，绝不覆盖已写死的配置。"""
+    validate_config(cfg)
     slug = cfg.get("repo") or origin_slug() or "owner/name"
     name = cfg.get("name") or slug.split("/")[-1]
     cfg.setdefault("repo", slug)
@@ -105,9 +331,15 @@ def with_defaults(cfg):
 
 
 def is_managed(path):
-    """判断已有文件是否为 docsite 下发（两种标记：外壳用注释串，脚本用 marker 行）。"""
+    """判断已有文件是否为 docsite 下发。
+
+    三种标记:注释串(`docsite: managed file`)、脚本 marker 行
+    (`docsite-managed-file:`)、package.json 的 JSON 字段(`"docsite-managed-file"`)。
+    """
     text = path.read_text(encoding="utf-8", errors="ignore")
-    return "docsite: managed file" in text[:400] or "docsite-managed-file:" in text
+    return ("docsite: managed file" in text[:400]
+            or "docsite-managed-file:" in text
+            or '"docsite-managed-file"' in text[:400])
 
 
 def default_branch(root):
@@ -138,8 +370,21 @@ def write_file(path, text, overwrite):
     if path.exists() and not overwrite:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    # newline="":不做平台换行翻译,托管文件跨平台字节一致(SYNCED 依赖这一点)
+    path.write_text(text, encoding="utf-8", newline="")
     return True
+
+
+def _backup_file(path):
+    """保留所有历史备份,重复执行也不覆盖原始内容。"""
+    backup = Path(str(path) + ".docsite.bak")
+    serial = 1
+    while backup.exists():
+        backup = Path(str(path) + f".{serial}.docsite.bak")
+        serial += 1
+    shutil.copy2(path, backup)
+    print(f"  ! {path} 已备份为 {backup};请核对并合并自定义 scripts/依赖等字段")
+    return backup
 
 
 def other_pages_workflow(dst):
@@ -173,70 +418,41 @@ def copy_vendor(overwrite):
 def cmd_init(args):
     if CONFIG.exists():
         sys.exit(f"{CONFIG} 已存在；要刷新托管文件请用 update")
+    # 已有 docsite 托管的 Docsify 旧壳:那是迁移场景,不是全新接入
+    for legacy in (Path("docs/index.html"), Path(".github/pages/index.html")):
+        if legacy.is_file() and is_managed(legacy):
+            sys.exit(f"检测到旧 Docsify 外壳 {legacy}；请改用 `python3 docsite.py migrate`")
     name = args.name or args.repo.split("/")[-1]
     default_desc = f"{name} 文档中心。内容直接来自仓库里的 Markdown，与代码同步更新。"
-    cfg = {
+    cfg = _v2_config({
         "repo": args.repo,
         "name": name,
         "emoji": args.emoji,
         "description": args.description or default_desc,
         "branch": args.branch,
-        "themeKey": (args.theme_key or f"{name.lower()}-theme"),
-        "version": 1,
-    }
+    })
+    if args.theme_key:
+        cfg["themeKey"] = args.theme_key  # v1 兼容参数,仅为显式传入时保留
 
     write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
 
-    # 内容骨架：只在缺失时创建（docs/ 根 = 中文）
-    for name_ in CONTENT_FILES:
-        text = render((TEMPLATE / name_).read_text(encoding="utf-8"), cfg)
-        if write_file(Path("docs") / name_, text, overwrite=False):
-            print(f"  + docs/{name_}")
+    # 内容骨架:只在缺失时创建(docs/ 根 = 中文,镜像在 docs/en/)
+    for base in (Path("docs"), Path("docs/en")):
+        src_dir = TEMPLATE / "docs" if base == Path("docs") else TEMPLATE / "docs/en"
+        for src in sorted(src_dir.glob("*.md")):
+            text = render(src.read_text(encoding="utf-8"), cfg)
+            if write_file(base / src.name, text, overwrite=False):
+                print(f"  + {base / src.name}")
 
-    # 英文镜像：docs/en/
-    for name_ in EN_CONTENT_FILES:
-        src = TEMPLATE / "en" / name_
-        if not src.exists():
-            continue
-        text = render(src.read_text(encoding="utf-8"), cfg)
-        if write_file(Path("docs") / "en" / name_, text, overwrite=False):
-            print(f"  + docs/en/{name_}")
-
-    # 老项目接入：已有的非 docsite 托管文件先备份，不静默覆盖
-    for tpl, d in managed_files().items():
-        if d.name == "docs.yml":
-            other = other_pages_workflow(d)
-            if other:
-                print(f"  = 已有 Pages workflow {other}，跳过托管 {d}（避免重复部署）")
-                continue
-        if d.exists() and not is_managed(d):
-            bak = Path(str(d) + ".docsite.bak")
-            shutil.copy2(d, bak)
-            print(f"  ! {d} 已存在（非 docsite 托管），已备份为 {bak}，核对后删除")
-        text = render((TEMPLATE / tpl).read_text(encoding="utf-8"), cfg)
-        write_file(d, text, overwrite=True)
-        print(f"  + {d}")
-
-    # 老项目可能用别的文件名部署 Pages（如 static.yml），不删，只提示
-    wf_dir = Path(".github/workflows")
-    if wf_dir.exists():
-        for wf in sorted(wf_dir.glob("*.yml")):
-            if wf.name == "docs.yml":
-                continue
-            txt = wf.read_text(encoding="utf-8", errors="ignore")
-            if "deploy-pages" in txt or "upload-pages-artifact" in txt:
-                print(f"  ! 发现另一个 Pages workflow：{wf}，确认新流程正常后请删除，避免重复部署")
-
-    copy_vendor(overwrite=True)
-    write_file(shell_dir() / ".nojekyll", "", overwrite=True)
-    print(f"  + {vendor_dir()}/（docsify + 主题 + 搜索）")
+    _write_v2_managed(cfg)
 
     print(f"""
 完成。接下来：
-  1. 在 docs/ 里写 Markdown，把页面加进 docs/_sidebar.md
-  2. git add -A && git commit && git push
-  3. 推送后 workflow 自动部署；仓库 Settings → Pages 选 GitHub Actions
-     （首次 configure-pages 一般会自动设好）
+  1. npm install        （或 npm ci;需要 Node.js 22+）
+  2. 在 docs/ 里写 Markdown，把页面加进 docs/_sidebar.md
+  3. python3 docsite.py build && python3 docsite.py preview   本地验收
+  4. git add -A && git commit && git push
+     推送后 workflow 自动构建部署；仓库 Settings → Pages 选 GitHub Actions
 站点地址：https://{cfg['repo'].split('/')[0]}.github.io/{cfg['repo'].split('/')[1]}/
 以后升级模板：python3 /path/to/docsite/docsite.py update""")
 
@@ -245,6 +461,14 @@ def cmd_update(_args):
     if not CONFIG.exists():
         sys.exit("找不到 .docsite.json，请先在仓库根运行 init")
     cfg = with_defaults(json.loads(CONFIG.read_text(encoding="utf-8")))
+
+    if is_vitepress("."):
+        print("VitePress(v2)托管文件刷新:")
+        cfg = _v2_config(cfg)
+        write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
+        _write_v2_managed(cfg)
+        print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
+        return
 
     for tpl, d in managed_files().items():
         if d.name == "docs.yml":
@@ -262,10 +486,79 @@ def cmd_update(_args):
     print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
 
 
-def cmd_check(args):
-    """跨仓库校验下载页生成链路是否与模板一致。
+def _check_v2_files(root):
+    """v2 仓库的托管文件一致性:逐字节(依赖清单)、再渲染(workflow/config)、
+    再生成(sidebar)、token 无残留、.nojekyll 与 .gitignore 就位。"""
+    rows = []
+    cfg = with_defaults(json.loads((root / CONFIG).read_text(encoding="utf-8")))
 
-    只有这几个文件要求完全相同；index.html 等允许各仓库有差异，故不参与比对。
+    for tpl in ("package.json", "package-lock.json"):
+        rel = str(V2_MANAGED[tpl])
+        want = (TEMPLATE / tpl).read_text(encoding="utf-8")
+        target = root / V2_MANAGED[tpl]
+        if not target.is_file():
+            rows.append((root.name, rel, "MISSING", "-"))
+        elif target.read_text(encoding="utf-8", errors="ignore") != want:
+            rows.append((root.name, rel, "DRIFT", "被手改或版本落后"))
+        else:
+            rows.append((root.name, rel, "ok", ""))
+
+    # docs.yml:再渲染逐字比对(存在性由下发保证;被别的 Pages workflow 挡住时会缺失)
+    wf_rel = str(V2_MANAGED[".github/workflows/docs.yml"])
+    wf_dst = root / V2_MANAGED[".github/workflows/docs.yml"]
+    if other_pages_workflow(wf_dst):
+        rows.append((root.name, wf_rel, "n/a", "存在其他 Pages workflow,docs.yml 未下发"))
+    elif not wf_dst.is_file():
+        rows.append((root.name, wf_rel, "MISSING", "-"))
+    elif wf_dst.read_text(encoding="utf-8", errors="ignore") != \
+            render((TEMPLATE / ".github/workflows/docs.yml").read_text(encoding="utf-8"), cfg):
+        rows.append((root.name, wf_rel, "DRIFT", "被手改或版本落后"))
+    else:
+        rows.append((root.name, wf_rel, "ok", ""))
+
+    # config.mts:再渲染逐字比对 + token 无残留
+    cfg_dst = root / VP_CONFIG_REL
+    want_cfg = render_config((TEMPLATE / "docs/.vitepress/config.mts").read_text(encoding="utf-8"), cfg)
+    if not cfg_dst.is_file():
+        rows.append((root.name, VP_CONFIG_REL.as_posix(), "MISSING", "-"))
+    else:
+        got_cfg = cfg_dst.read_text(encoding="utf-8", errors="ignore")
+        if "@@" in got_cfg:
+            rows.append((root.name, VP_CONFIG_REL.as_posix(), "DRIFT", "渲染 token 残留(未渲染的 @@TOKEN@@)"))
+        elif got_cfg != want_cfg:
+            rows.append((root.name, VP_CONFIG_REL.as_posix(), "DRIFT", "与模板渲染结果不一致"))
+        else:
+            rows.append((root.name, VP_CONFIG_REL.as_posix(), "ok", ""))
+
+    # sidebar.generated.mjs ↔ _sidebar.md 一致性
+    gen = root / VP_SIDEBAR_REL
+    if not gen.is_file():
+        rows.append((root.name, VP_SIDEBAR_REL.as_posix(), "MISSING", "-"))
+    elif gen.read_text(encoding="utf-8", errors="ignore") != sidebar_module_text(root):
+        rows.append((root.name, VP_SIDEBAR_REL.as_posix(), "DRIFT", "与 _sidebar.md 不一致,运行 update"))
+    else:
+        rows.append((root.name, VP_SIDEBAR_REL.as_posix(), "ok", ""))
+
+    if not (root / "docs/public/.nojekyll").is_file():
+        rows.append((root.name, "docs/public/.nojekyll", "MISSING", "-"))
+    else:
+        rows.append((root.name, "docs/public/.nojekyll", "ok", ""))
+    gi = root / ".gitignore"
+    gi_lines = gi.read_text(encoding="utf-8").splitlines() if gi.is_file() else []
+    miss_gi = [e for e in GITIGNORE_ENTRIES if e not in gi_lines]
+    if miss_gi:
+        rows.append((root.name, ".gitignore", "DRIFT", f"缺 {', '.join(miss_gi)}"))
+    else:
+        rows.append((root.name, ".gitignore", "ok", ""))
+    return rows
+
+
+def cmd_check(args):
+    """跨仓库校验托管链路与模板一致。
+
+    下载页生成链路(v1/v2 通用):逐字节一致。VitePress(v2)仓库另查:
+    依赖清单逐字节、workflow/config 再渲染、sidebar 再生成、token 无残留、
+    .nojekyll 与 .gitignore 就位。index.html 等允许各仓库有差异,不参与比对。
 
     语言命名规范只约束人工维护的 README / docs 内容。机器生成、行业约定或合规类
     文件（CHANGELOG.md、THIRD_PARTY_NOTICES.md、LICENSE、SECURITY.md 等）允许保留
@@ -290,6 +583,8 @@ def cmd_check(args):
         if not (root / "docs").is_dir() and not (root / ".github" / "pages").is_dir():
             rows.append((root.name, "—", "skipped", "不是文档站"))
             continue
+        if is_vitepress(root):
+            rows.extend(_check_v2_files(root))
         # 未采用托管生成器：下载页为手写，不参与比对（约定允许 npm/PyPI 类仓库手写）。
         if not any((root / dst).exists() for dst in SYNCED.values()):
             rows.append((root.name, "—", "n/a", "未使用托管生成器（手写下载页）"))
@@ -377,7 +672,8 @@ def _nav_config(root):
         return cfg, problems
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
+        validate_config(doc)
+    except ValueError as e:
         return cfg, [f".docsite.json 不是合法 JSON（{e}）"]
     nav = doc.get("navigation")
     if nav is None:
@@ -462,7 +758,7 @@ def _copied_into_site(root):
                         continue
                     files = [f for f in hit.rglob("*") if f.is_file()] if hit.is_dir() else [hit]
                     for f in files:
-                        rel = str(f.relative_to(root)) if hit.is_dir() else f.name
+                        rel = str(f.relative_to(root).as_posix()) if hit.is_dir() else f.name
                         out.add("/" + f"{base}/{rel}" if base else "/" + rel)
     return out
 
@@ -477,6 +773,43 @@ def _check_sidebar_targets(name, path, root, issues, published):
         if page not in published:
             issues.append((name, "BROKEN_SIDEBAR_LINK",
                            f"「{label}」-> `{target}` 在站点里不存在（未发布的路径）", "error"))
+
+
+def _check_vp_targets(name, path, root, issues):
+    """v2(VitePress):侧边栏链接必须指向 docs/ 下真实存在的页面。
+
+    路由对照:rewrites 把 README.md 映射为 index,故 `/` 查 docs/README.md、
+    `/en/` 查 docs/en/README.md;`.md` 后缀可有可无(转换器已去后缀)。
+    """
+    root = Path(root)
+    for _indent, label, target in _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")):
+        if target is None or _is_external(target):
+            continue
+        page = target.split("#")[0]
+        if not page.startswith("/"):
+            continue  # 相对链接交给 NOT_ROOT_ABSOLUTE 提示
+        rel = page.strip("/")
+        if rel in ("", "en"):
+            ok = (root / "docs" / rel / "README.md").is_file()
+        else:
+            if not rel.endswith(".md"):
+                rel += ".md"
+            ok = (root / "docs" / rel).is_file()
+        if not ok:
+            issues.append((name, "BROKEN_SIDEBAR_LINK",
+                           f"「{label}」-> `{target}` 在 docs/ 下不存在（VitePress 路由）", "error"))
+
+
+def _check_sidebar_consistency(name, root, issues):
+    """v2:sidebar.generated.mjs 必须与 _sidebar.md 的再生成结果逐字一致。"""
+    got = Path(root) / VP_SIDEBAR_REL
+    if not got.is_file():
+        issues.append((name, "SIDEBAR_STALE",
+                       f"缺少 {VP_SIDEBAR_REL}；运行 update 重新生成", "error"))
+        return
+    if got.read_text(encoding="utf-8", errors="ignore") != sidebar_module_text(root):
+        issues.append((name, "SIDEBAR_STALE",
+                       "sidebar.generated.mjs 与 _sidebar.md 不一致；运行 update 重新生成", "error"))
 
 
 def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
@@ -540,26 +873,261 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
                            f"「{label}」只有 1 个页面，考虑并入相邻分类", "warning"))
 
 
+# Docsify hash 路由链接:`](#/page)` / `](#/)`(普通 `](#anchor)` 是页内锚点,不动)
+HASH_LINK = re.compile(r"\]\(#/([^)\s]*)\)")
+
+
+def _rewrite_hash_links(text):
+    """docsify 的 `#/` hash 路由 → 根绝对路径链接;返回(新文本, 替换次数)。"""
+    count = 0
+    def sub(m):
+        nonlocal count
+        count += 1
+        target = m.group(1)
+        return f"](/{target})"
+    return HASH_LINK.sub(sub, text), count
+
+
+def _strip_docs_prefix(text):
+    """壳形态链接 `/docs/...` → `/...`(docs/ 在新形态就是站点根);返回(新文本, 次数)。"""
+    return text.replace("](/docs/", "](/"), text.count("](/docs/")
+
+
+def _collect_md(root):
+    """docs/ 下的 Markdown(用户内容 + sidebar 源),不含 .vitepress 托管目录。"""
+    docs = Path(root) / "docs"
+    if not docs.is_dir():
+        return []
+    return [p for p in sorted(docs.rglob("*.md")) if ".vitepress" not in p.parts]
+
+
+def _analyze_pages_workflow(root):
+    """识别旧 Pages workflow(static.yml 等):是否还拷贝 docs 之外的目录。"""
+    root = Path(root)
+    findings = []
+    for wf in sorted((root / ".github/workflows").glob("*.y*ml")):
+        if wf.name == "docs.yml":
+            continue
+        text = wf.read_text(encoding="utf-8", errors="ignore")
+        if "upload-pages-artifact" not in text and "deploy-pages" not in text:
+            continue
+        # 支持 block run 和单行 run: cp -R ...;只报告来源,不执行 shell。
+        copies = sorted({m.group(1).strip("\"'") for m in re.finditer(
+            r"(?:^|[;|&]\s*|run:\s*)\s*cp\s+(?:-[\w-]+\s+)*([^\s;|&]+)", text, re.M)})
+        findings.append((wf, copies))
+    return findings
+
+
+def cmd_migrate(args):
+    """把 docsite 托管的 Docsify 旧形态迁移到 VitePress(v2)。
+
+    步骤:备份受管 Docsify 文件 → 写入 VitePress 结构 → 改写 `#/` hash 链接与
+    壳形态 `/docs/` 前缀 → .docsite.json 升级(engine/version: 2)。
+    --dry-run 只打印计划不写盘;失败不清删任何原文件;旧文件清理是构建验证
+    通过后的独立人工步骤(提示,不自动执行)。
+    """
+    root = Path(args.path or ".")
+    cfg_path = root / CONFIG
+    if not cfg_path.is_file():
+        sys.exit(f"{root} 没有 .docsite.json;仅迁移 docsite 托管仓库(手写站点不在此列)")
+    if is_vitepress(root):
+        sys.exit("已是 VitePress(v2)形态;要刷新托管文件请用 update")
+
+    # 旧形态检测:两种壳,必须含托管标记(手写 docsify 站不迁)
+    shells = [p for p in (root / "docs/index.html", root / ".github/pages/index.html")
+              if p.is_file() and is_managed(p)]
+    if not shells:
+        sys.exit("未检测到 docsite 托管的 Docsify 外壳"
+                 "(docs/index.html 或 .github/pages/index.html 含托管标记)")
+    shell_form = (root / ".github/pages/index.html") in shells
+
+    cfg = with_defaults(json.loads(cfg_path.read_text(encoding="utf-8")))
+    new_cfg = _v2_config(cfg)
+
+    # ---- 迁移计划(全部先算后写;--dry-run 在此输出并退出) ----
+    plans = []      # ('~', rel, note) 修改/新增
+    backups = []    # ('!', bak_rel, src_rel)
+    renames = []    # ('>', new_rel, old_rel)
+    warnings = []   # ('!', text)
+
+    # 1. 备份受管 Docsify 文件(旧壳 index.html + vendor;static.yml/旧 docs.yml 见下)
+    for shell in shells:
+        vendor = shell.parent / "assets" / "vendor"
+        managed = [shell] + (sorted(vendor.iterdir()) if vendor.is_dir() else [])
+        for f in managed:
+            backups.append((f"{f.relative_to(root).as_posix()}.docsite.bak", f.relative_to(root).as_posix()))
+    old_wf = root / ".github/workflows/docs.yml"
+    if old_wf.is_file() and is_managed(old_wf):
+        backups.append((".github/workflows/docs.yml.docsite.bak", ".github/workflows/docs.yml"))
+
+    # 2. 旧 Pages workflow(static.yml 等):解析 cp 拷贝物,报告;改名停用(等效备份)
+    for wf, copies in _analyze_pages_workflow(root):
+        extra = f";它还把 {', '.join(c for c in copies if c != 'docs' and c != '.github/pages')} 拷进站点" \
+            if any(c not in ("docs", ".github/pages") for c in copies) else ""
+        renames.append((f"{wf.relative_to(root).as_posix()}.docsite.bak", wf.relative_to(root).as_posix()))
+        warnings.append(f"{wf.name} 是旧 Pages 部署{extra};已改名停用(备份即改名产物)。"
+                        "确认新部署正常后删除备份;若它还承担其他发布任务,请先人工拆分")
+
+    # 3. 链接改写:统计将改动的文件与处数
+    md_files = _collect_md(root)
+    hash_hits, prefix_hits = {}, {}
+    for p in md_files:
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        n1 = len(HASH_LINK.findall(text))
+        n2 = text.count("](/docs/") if shell_form else 0
+        if n1:
+            hash_hits[p] = n1
+        if n2:
+            prefix_hits[p] = n2
+
+    # 4. 壳形态:外壳 sidebar 是用户内容,复制进 docs/(仅缺失时),一并参与链接改写
+    sidebar_src = root / ".github/pages/_sidebar.md"
+    if shell_form and sidebar_src.is_file() and not (root / "docs/_sidebar.md").is_file():
+        plans.append(("~", "docs/_sidebar.md", "从 .github/pages/_sidebar.md 复制,改写 hash 链接及 /docs/ 前缀(原文保留)"))
+
+    # 5. 下载页配置:壳形态 linkBase "/docs" 要清空(新形态 docs/ 即站点根)
+    dl_cfg = root / ".github/scripts/download-page.json"
+    link_base_note = None
+    if dl_cfg.is_file():
+        try:
+            data = json.loads(dl_cfg.read_text(encoding="utf-8"))
+            if (data.get("linkBase") or "").rstrip("/") == "/docs":
+                link_base_note = 'linkBase "/docs" → ""(docs/ 现在是站点根)'
+        except json.JSONDecodeError:
+            warnings.append("download-page.json 不是纯 JSON(可能含注释),请人工核对 linkBase")
+
+    plans += [
+        ("+", "package.json / package-lock.json", "VitePress 依赖(模板锁定)"),
+        ("+", VP_CONFIG_REL.as_posix(), "站点配置(托管)"),
+        ("+", VP_SIDEBAR_REL.as_posix(), "由 _sidebar.md 生成(托管)"),
+        ("+", "docs/public/.nojekyll", ""),
+        ("+", ".github/workflows/docs.yml", "Node 22 构建 + Pages 部署"),
+        ("~", ".docsite.json",
+         f"engine=vitepress, engineVersion={new_cfg['engineVersion']}, version=2"),
+        ("~", ".gitignore", "补 node_modules / dist / cache(缺才加)"),
+    ]
+    for p, n in hash_hits.items():
+        plans.append(("~", str(p.relative_to(root).as_posix()), f"改写 docsify hash 链接 {n} 处"))
+    for p, n in prefix_hits.items():
+        plans.append(("~", str(p.relative_to(root).as_posix()), f"去掉链接 /docs/ 前缀 {n} 处"))
+    # 正文、仓库配置也保留原件;失败后可以从备份恢复,不依赖 git 状态。
+    for p in sorted(set(hash_hits) | set(prefix_hits) | {cfg_path} | ({dl_cfg} if link_base_note else set())):
+        rel = p.relative_to(root).as_posix()
+        backups.append((rel + ".docsite.bak", rel))
+    if link_base_note:
+        plans.append(("~", ".github/scripts/download-page.json", link_base_note))
+    for rel in list(V2_MANAGED.values()) + [VP_CONFIG_REL, VP_SIDEBAR_REL] + [Path(p) for p in SYNCED.values()]:
+        target = root / rel
+        if target.is_file() and not is_managed(target):
+            warnings.append(f"接管 {rel.as_posix()} 前将备份为 *.docsite.bak;请人工合并自定义 scripts/依赖等字段")
+    for rel in SYNCED.values():
+        plans.append(("+", rel, "下载页生成链路(托管)"))
+
+    # 根目录 *.md 原来由 static.yml 发布,新形态不再自动发布——只提示,不移动
+    root_md = sorted(p.name for p in root.glob("*.md"))
+    if shell_form and root_md:
+        warnings.append(f"根目录 {', '.join(root_md)} 不再随站点发布;如需保留请移入 docs/ 或改写链接")
+
+    print(f"迁移计划:{root.resolve().name}"
+          f"({'壳形态 .github/pages/' if shell_form else 'docs/ 形态'} → VitePress)")
+    for mark, rel, note in plans:
+        print(f"  {mark} {rel}" + (f"  ({note})" if note else ""))
+    for bak, src in backups:
+        print(f"  ! 备份 {src} → {bak}")
+    for new, old in renames:
+        print(f"  > 停用 {old} → {new}")
+    for w in warnings:
+        print(f"  ! {w}")
+    if args.dry_run:
+        print("\n--dry-run:未写盘。去掉 --dry-run 执行迁移。")
+        return 0
+
+    # ---- 执行 ----
+    for bak_rel, src_rel in backups:
+        src = root / src_rel
+        if src.is_file():
+            _backup_file(src)
+            print(f"  ! 备份 {src_rel} → {bak_rel}")
+    for new_rel, old_rel in renames:
+        old = root / old_rel
+        if old.is_file():
+            _backup_file(old)
+            old.unlink()  # 只停用旧 workflow;备份成功后才移除生效文件
+            print(f"  > 停用 {old_rel} → {new_rel}")
+
+    if shell_form and sidebar_src.is_file() and not (root / "docs/_sidebar.md").is_file():
+        shutil.copy2(sidebar_src, root / "docs/_sidebar.md")
+        print("  ~ docs/_sidebar.md(从外壳复制)")
+        md_files = _collect_md(root)
+
+    for p in md_files:
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        new_text, n1 = _rewrite_hash_links(text)
+        if shell_form:
+            new_text, n2 = _strip_docs_prefix(new_text)
+        else:
+            n2 = 0
+        if n1 or n2:
+            write_file(p, new_text, overwrite=True)
+            print(f"  ~ {p.relative_to(root).as_posix()}(hash {n1} 处 / 前缀 {n2} 处)")
+
+    if link_base_note:
+        data = json.loads(dl_cfg.read_text(encoding="utf-8"))
+        data["linkBase"] = ""
+        dl_cfg.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                          encoding="utf-8", newline="")
+        print("  ~ .github/scripts/download-page.json(linkBase 清空)")
+
+    cfg_path.write_text(json.dumps(new_cfg, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8", newline="")
+    print("  ~ .docsite.json(engine/version: 2)")
+    _write_v2_managed(new_cfg, root=root)
+
+    print("""
+迁移完成,接下来:
+  1. npm install && python3 docsite.py build && python3 docsite.py preview   本地验收
+  2. 核对 diff(链接改写、.docsite.bak、停用的 workflow)
+  3. 构建与预览通过后,人工清理:旧壳文件(备份在 *.docsite.bak)与 .github/pages/ 残留
+  4. 每仓库独立 PR,diff 可见可控;回滚 = git checkout""")
+    return 0
+
+
+def cmd_run_docs(args):
+    """build/preview/dev:包装 npm run docs:*(渲染交给 VitePress CLI,Python 不做渲染)。"""
+    if not is_vitepress("."):
+        sys.exit("当前仓库不是 VitePress(v2)形态;Docsify 旧站点请先运行 migrate")
+    if not Path("package.json").is_file():
+        sys.exit("缺少 package.json;先运行 python3 docsite.py update 下发托管文件")
+    npm = shutil.which("npm")
+    if not npm:
+        sys.exit("未检测到 npm。请先安装 Node.js 22+(https://nodejs.org/),"
+                 "再运行 npm install 后重试。")
+    if not Path("node_modules/vitepress").is_dir():
+        print("本地尚未安装依赖,先执行 npm ci …")
+        if subprocess.call([npm, "ci"]):
+            sys.exit("npm ci 失败;请检查网络或手动运行 npm install")
+    sys.exit(subprocess.call([npm, "run", f"docs:{args.cmd}"]))
+
+
 def cmd_navcheck(args):
     """校验导航信息架构规约（确定性规则；主观的「分类好不好」不在检查范围）。
 
-    error（返回非零）：
+    规则表按引擎分两套（D-009 迁移期双轨，migrate 完成后 Docsify 表退役）：
+
+    v2（VitePress，docs/.vitepress/config.mts 在场）error：
       COMBINED_LOCALES   根 sidebar 出现 /en/ 文档树（语言是站点维度，不是导航分类）
       EN_SIDEBAR_MISSING 有 docs/en/ 页面但缺 docs/en/_sidebar.md
-      ANCHOR_LINK        sidebar 出现页内锚点（首页目录混入导航；可用
-                         .docsite.json navigation.allowSidebarAnchors 显式豁免）
+      ANCHOR_LINK        sidebar 出现页内锚点（可用 navigation.allowSidebarAnchors 豁免）
       DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
-      BROKEN_SIDEBAR_LINK 侧边栏链接指向站点里不存在的页面（按实际发布路径判定：
-                         新形态站点根是 docs/，老形态是 .github/pages + 根 *.md + docs/）
-      GLOBAL_SIDEBAR_ALIAS  index.html 用 '/.*/_sidebar.md' 通配 alias 强制根侧边栏
-                         （破坏分语言导航，docsify 原生按目录解析即可，无需 alias）
-      NAVIGATION_SCHEMA  .docsite.json 的 navigation 字段非法（未知字段 / 非布尔值 /
-                         非法 JSON）——白名单制，不给万能逃生口
-    warning（仅提示，不影响退出码）：
-      SINGLE_PAGE_CATEGORY 顶级分类只有 1 个页面
-      NOT_ROOT_ABSOLUTE   本地链接未用根绝对路径
-      EN_SIDEBAR_ZH_LINK  英文 sidebar 指向中文页面且未标注（中文）
-      HEADING_INJECTION   index.html 配置 subMaxLevel，页内标题被注入 sidebar 渲染
+      BROKEN_SIDEBAR_LINK 侧边栏链接在 docs/ 下不存在（路由对照：/ ↔ README.md）
+      SIDEBAR_STALE      sidebar.generated.mjs 与 _sidebar.md 再生成结果不一致
+      NAVIGATION_SCHEMA  .docsite.json navigation 字段非法（白名单制）
+
+    v1（Docsify，未迁移仓库，规则保持原样以兼容存量）error 额外有：
+      GLOBAL_SIDEBAR_ALIAS / HEADING_INJECTION（docsify 外壳专属，v2 下无此文件）
+      BROKEN_SIDEBAR_LINK 按发布路径判定（壳形态 .github/pages + 根 *.md + docs/）
+
+    warning（两套共用）：SINGLE_PAGE_CATEGORY / NOT_ROOT_ABSOLUTE / EN_SIDEBAR_ZH_LINK
     例外必须写入仓库 .docsite.json 的 navigation 字段，检查器不静默忽略。
     """
     if args.all:
@@ -600,26 +1168,32 @@ def cmd_navcheck(args):
             _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues,
                               en_prefix=en_prefix)
 
-        published = published_paths(root)
-        _check_sidebar_targets(root.name, zh, root, issues, published)
-        if en.is_file():
-            _check_sidebar_targets(f"{root.name}/en", en, root, issues, published)
+        if is_vitepress(root):
+            _check_vp_targets(root.name, zh, root, issues)
+            if en.is_file():
+                _check_vp_targets(f"{root.name}/en", en, root, issues)
+            _check_sidebar_consistency(root.name, root, issues)
+        else:
+            published = published_paths(root)
+            _check_sidebar_targets(root.name, zh, root, issues, published)
+            if en.is_file():
+                _check_sidebar_targets(f"{root.name}/en", en, root, issues, published)
 
-        # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
-        # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。
-        for shell in (root / "docs/index.html", root / ".github/pages/index.html"):
-            if not shell.is_file():
-                continue
-            stext = shell.read_text(encoding="utf-8", errors="ignore")
-            # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
-            if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
-                issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
-                               f"{shell.relative_to(root)} 配置了 '/.*/_sidebar.md' 通配 alias，"
-                               "会把 /en/ 页面静默改写回根侧边栏，破坏分语言导航", "error"))
-            if re.search(r"subMaxLevel\s*:", stext):
-                issues.append((root.name, "HEADING_INJECTION",
-                               f"{shell.relative_to(root)} 配置了 subMaxLevel，"
-                               "当前页标题会被注入 sidebar 渲染", "warning"))
+            # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
+            # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。
+            for shell in (root / "docs/index.html", root / ".github/pages/index.html"):
+                if not shell.is_file():
+                    continue
+                stext = shell.read_text(encoding="utf-8", errors="ignore")
+                # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
+                if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
+                    issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
+                                   f"{shell.relative_to(root)} 配置了 '/.*/_sidebar.md' 通配 alias，"
+                                   "会把 /en/ 页面静默改写回根侧边栏，破坏分语言导航", "error"))
+                if re.search(r"subMaxLevel\s*:", stext):
+                    issues.append((root.name, "HEADING_INJECTION",
+                                   f"{shell.relative_to(root)} 配置了 subMaxLevel，"
+                                   "当前页标题会被注入 sidebar 渲染", "warning"))
 
         if not issues:
             print(f"✅ {root.name}")
@@ -640,9 +1214,13 @@ def cmd_navcheck(args):
 
 
 def main():
+    # Windows 的传统控制台编码不能表示所有 emoji/状态符号;诊断不应因此崩溃。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     if not TEMPLATE.exists():
         sys.exit(f"找不到模板目录 {TEMPLATE}")
-    p = argparse.ArgumentParser(description="docsify 文档站脚手架")
+    p = argparse.ArgumentParser(description="轻量级文档网站生成器(VitePress 引擎,Python 管工程)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     i = sub.add_parser("init", help="在当前仓库初始化文档站")
@@ -667,8 +1245,22 @@ def main():
     n.add_argument("--all", help="扫描该目录下所有 git 仓库")
     n.set_defaults(func=cmd_navcheck)
 
+    m = sub.add_parser("migrate", help="把 docsite 托管的 Docsify 旧形态迁移到 VitePress")
+    m.add_argument("path", nargs="?", default=".", help="目标仓库路径，默认当前目录")
+    m.add_argument("--dry-run", action="store_true", help="只打印迁移计划，不写盘")
+    m.set_defaults(func=cmd_migrate)
+
+    for name, blurb in (("build", "构建站点（npm run docs:build）"),
+                        ("preview", "本地预览构建产物（npm run docs:preview）"),
+                        ("dev", "启动开发服务器（npm run docs:dev）")):
+        d = sub.add_parser(name, help=blurb)
+        d.set_defaults(func=cmd_run_docs, cmd=name)
+
     args = p.parse_args()
-    sys.exit(args.func(args) or 0)
+    try:
+        sys.exit(args.func(args) or 0)
+    except ValueError as error:
+        sys.exit(f"配置错误: {error}")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@
 
 ## Attach a new repository
 
+Requires Python 3, Node.js 22+ and npm. The Python management layer uses the standard library; VitePress requires dependency installation and a build.
+
 Inside the **target repository root**:
 
 ```bash
@@ -14,6 +16,9 @@ python3 /tmp/docsite/docsite.py init \
   --name DisplayName \
   --emoji 🐱 \
   --branch main
+npm ci
+python3 /tmp/docsite/docsite.py build
+python3 /tmp/docsite/docsite.py preview
 ```
 
 | Flag | Meaning | Default |
@@ -23,12 +28,14 @@ python3 /tmp/docsite/docsite.py init \
 | `--emoji` | Favicon and title emoji | 📘 |
 | `--description` | Page meta description | `<name> documentation…` |
 | `--branch` | Branch that triggers deployment | `main` |
-| `--theme-key` | localStorage key for the theme preference | `<lowercased name>-theme` |
+| `--theme-key` | Legacy Docsify compatibility only; VitePress manages theme preferences | unset |
 
 Two kinds of files come out:
 
 ```
-Managed (do not edit)   docs/index.html · docs/assets/vendor/
+Managed (do not edit)   package.json · package-lock.json
+                        docs/.vitepress/config.mts · sidebar.generated.mjs
+                        docs/public/.nojekyll
                         .github/workflows/docs.yml
                         .github/scripts/update_download_page.py
                         .github/workflows/update-download-page.yml
@@ -42,32 +49,34 @@ GitHub Actions (the first `configure-pages` run normally does it). The site live
 
 ## Attach an existing repository
 
-When a `docs/` directory or another docs site already exists, `init` is defensive:
+Existing docsite configurations and managed Docsify shells require an explicit migration. See [Upgrade and rollback](/en/UPGRADE.md).
 
-- An existing `docs/index.html` or `.github/workflows/docs.yml` that is *not* the
-  docsite-managed version is backed up to `*.docsite.bak` rather than silently replaced
-- A Pages workflow under a different filename (for example `static.yml`) is reported,
-  not deleted
-- Existing Markdown is never touched
+```bash
+python3 /tmp/docsite/docsite.py migrate --dry-run
+python3 /tmp/docsite/docsite.py migrate
+npm ci
+python3 /tmp/docsite/docsite.py build
+python3 /tmp/docsite/docsite.py preview
+```
 
 Afterwards:
 
-1. Review `git status` and check whether `docs/index.html.docsite.bak` holds custom
-   configuration worth merging into the template
-2. Once `docs.yml` deploys successfully, delete the old deploy workflow so the site is
-   not deployed twice
-3. Align the sidebar with the navigation contract
+1. Review the diff, backups, rewritten links and disabled legacy workflow.
+2. Existing Node projects must merge their scripts and dependencies into the managed root package.json.
+3. Remove legacy shells only after build and preview pass. Use one PR per repository.
+
+For a new site, init preserves existing Markdown and fills in missing starter pages. Non-managed configurations are backed up before takeover. An existing alternative Pages workflow blocks generation of docs.yml until deployment responsibilities are resolved.
 
 ## Day-to-day edits
 
-No script needed. Edit Markdown directly:
+Edit Markdown directly; regenerate the sidebar after changing its source:
 
 1. Add or change a `.md` under `docs/`
 2. Add its link to `docs/_sidebar.md` using a **root-absolute path** (`- [Title](/PAGE.md)`)
-3. `git commit && git push`. The workflow watches `docs/**` and the site updates in a
-   minute or two
+3. Run `python3 /tmp/docsite/docsite.py update`, then `build` and `preview`.
+4. Review, commit and push. CI installs locked dependencies and builds with Node 22.
 
-A relative sidebar link (`[Title](PAGE.md)`) breaks with a 404 on `docs/en/` pages.
+Only edit `_sidebar.md`, never `sidebar.generated.mjs`. The default theme provides light/dark modes, local search and page outlines. README.md remains the homepage source, rewritten to `/` and `/en/`.
 
 ## Check consistency
 

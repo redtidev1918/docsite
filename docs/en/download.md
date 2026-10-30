@@ -7,8 +7,7 @@
 <!-- docsite: hand-written until the first release; the managed generator
      (update_download_page.py) rewrites this page once a release exists. -->
 
-> This repository ships no packages and no release artifacts. docsite is a single
-> Python script plus a template. No pip, no npm, no build step, no dependency install.
+> Distributed as source and templates. The Python management layer uses the standard library; building the site requires Node.js 22+, npm ci and VitePress.
 
 ## How to get it
 
@@ -36,5 +35,7 @@ git -C /tmp/docsite checkout <commit>
 ```
 
 ## Next
+
+After initializing the target repository, run `npm ci`, then `npm run docs:build` and `npm run docs:preview`.
 
 - [Quick Start](/en/QUICKSTART.md): attach a docs site to a repository
