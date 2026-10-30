@@ -9,6 +9,7 @@ Describe installation and usage steps.
 
 ## Notes
 
-- Markdown is rendered at runtime; push and the site updates automatically
-- The sidebar lives in `docs/_sidebar.md`
+- VitePress builds the Markdown site; requires Node.js 22+ and `npm ci`
+- Edit `docs/en/_sidebar.md`, then run docsite `update` to regenerate navigation
+- Verify locally with `npm run docs:build` and `npm run docs:preview`
 - Chinese pages are the same-named files directly under `docs/`

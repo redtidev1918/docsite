@@ -2,3 +2,7 @@
   - [Overview](/en/)
   - [📥 Download](/en/download.md)
   - [Quick Start](/en/QUICKSTART.md)
+- Conventions
+  - [File Conventions](/en/CONVENTIONS.md)
+  - [Navigation Contract](/en/NAVIGATION.md)
+  - [Upgrade](/en/UPGRADE.md)

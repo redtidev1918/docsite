@@ -17,6 +17,14 @@
 
 ---
 
+## 2026-10-30 · 阶段 5 本仓库交付准备与六站重建范围
+
+- **已完成:** 根目录中英文 README、站内首页/快速开始/规范/导航/升级和下载页同步到 VitePress 定位;补齐英文规范镜像与导航。更新自身描述与 version:2,由 update 生成配置/sidebar。新增 PR CI:Python、Node 22 npm ci/build、无 .git 副本 check/navcheck。
+- **最终本地验证:** 60 测试通过(1 skip);npm ci 成功;Node 22.23.4 build 零 dead link;check 9/9、navcheck 通过。文档更新后再次运行浏览器矩阵,72 次渲染无整体横向滚动/资源错误,36 张截图已刷新并抽查新版中英与移动端。
+- **用户新增范围:** docsite 上线后重建 DAViewer、DeviantDrop、deviantart-downloader、PixivFlow、TelePost、NekoTime 六个站点。按新引擎重建理解;先一个试点,再逐个独立 PR 与构建/线上/下载页验收,不自动合并。
+- **限制:** package.json/lock 逐字节托管与已有 Node 业务工程自定义依赖存在冲突,UPGRADE 双语明确人工合并与后续 DRIFT/update 覆盖限制。
+- **未完成:** 所有者合并后的 Pages 上线、真实 release/dispatch 验证与下游试点。按总纲顺序,本仓库正式上线验收前不推进业务仓库迁移。
+
 ## 2026-10-30 · 收尾复核:配置安全与版本元数据
 
 - **已完成:** .docsite.json 顶层白名单/字段类型、repo/branch 上下文校验;JS token 通过 json.dumps 转义双引号、控制字符和 Unicode 行分隔符。v2 update 同步 engineVersion/version 元数据。

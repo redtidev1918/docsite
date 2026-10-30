@@ -8,7 +8,7 @@ const sidebar = (await import('./sidebar.generated.mjs')).default
 export default defineConfig({
   lang: 'zh-CN',
   title: '🛠️ docsite',
-  description: 'docsite —— 零依赖的 docsify 文档站脚手架',
+  description: 'docsite —— VitePress 引擎与 Python 工程管理层组成的轻量级文档网站生成器',
   base: '/docsite/',
   // 亮暗随系统,右上角可切换(默认主题行为)
   appearance: true,

@@ -40,11 +40,11 @@
 
 ## 阶段 5 — 发布与逐步迁移
 
-- ⬜ 5-1 中英文档更新(README/QUICKSTART/CONVENTIONS/NAVIGATION/UPGRADE;「零构建」表述改为新架构说明)
-- ⬜ 5-2 docsite 自身站点切换 VitePress 并上线 Pages
-- ⬜ 5-3 选一个业务仓库试点迁移,验收(备份可回滚)
-- ⬜ 5-4 逐个迁移 PixivFlow/DAViewer/TelePost 等(每个仓库 diff 可见可控,不批量)
-- ⬜ 5-5 整理提交、创建 PR(不自动合并)
+- ✅ 5-1 中英文档更新,补齐英文规范/导航/升级页;明确 Node 22/npm ci 与 Node 工程接管限制
+- ⬜ 5-2 docsite 自身切换配置就绪;真实 Pages 发布待所有者合并 PR
+- ⬜ 5-3 docsite 上线后从用户指定六站中选择一个业务仓库试点
+- ⬜ 5-4 试点验收后逐个独立 PR:DAViewer、DeviantDrop、deviantart-downloader、PixivFlow、TelePost、NekoTime
+- 🔄 5-5 整理提交、创建 PR(不自动合并);新增 PR 上的 Python/Node22/build/check/navcheck CI
 
 ## 已归档(不再执行)
 

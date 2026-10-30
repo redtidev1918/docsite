@@ -12,7 +12,7 @@
   - 新测试文件未跟踪:`tests/test_migration.py`(28 例)、`tests/test_build.py`(4 例)。
   - 仓库根 `package.json` 已同步模板(含标记)。
 - 测试现状:`python -m unittest discover -s tests` → **56 例,3 FAIL + 1 ERROR + 1 skip**,全部在阶段 3 新测试里,**原因已逐一查明,见 §1**。
-- 后台残留:`vitepress preview` 可能还在 4173 端口跑(后台任务,不用管,重启即失效);IAB 浏览器标签页开着 `http://127.0.0.1:4173/docsite/…`。
+- 后台残留:无(4173 端口的 preview 任务已退出);IAB 浏览器标签页可能还开着 `http://127.0.0.1:4173/docsite/…`(死链,需预览时自己重启 preview)。
 
 ## 1. 第一步:修掉 4 个已知测试失败(都不难)
 

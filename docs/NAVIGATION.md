@@ -1,6 +1,6 @@
 # 导航契约
 
-**语言 / Language:** 中文 · [English](/en/)
+**语言 / Language:** 中文 · [English](/en/NAVIGATION.md)
 
 ## 哲学
 
@@ -33,13 +33,13 @@ README 新增 FAQ / Roadmap / Acknowledgments 等 section **不**意味着侧边
 | 5 | 顶级分类通常至少 2 个页面（语言入口「中文 / English」这类分类不在此列） | warning `SINGLE_PAGE_CATEGORY` |
 | 6 | 本地链接用根绝对路径 | warning `NOT_ROOT_ABSOLUTE` |
 | 7 | 英文 sidebar 指向中文页面必须标注（中文）：逐条标注，或整类挂在「中文 / Chinese」分类下 | warning `EN_SIDEBAR_ZH_LINK` |
-| 8 | sidebar 链接必须指向站点里真实发布的页面（按发布布局判定：新形态站点根是 `docs/`，壳形态是 `.github/pages` + 根 `*.md` + `docs/`） | error `BROKEN_SIDEBAR_LINK` |
+| 8 | v2 sidebar 链接必须对应 docs/ 下真实页面；`/` 对应 README.md、`.md` 后缀转换为 VitePress 路径 | error `BROKEN_SIDEBAR_LINK` |
+| 9 | sidebar.generated.mjs 必须与 _sidebar.md 再生成结果一致 | error `SIDEBAR_STALE` |
 
 error 影响退出码；warning 只提示（比如项目正在扩展分类，单页面分类是过渡状态）。
 「分类名字好不好」这类主观判断**不**自动检查。
 
-英文前缀跟着布局走：新形态是 `/en/…`，`.github/pages` 壳形态（`static.yml` 拼接发布）
-的英文页在 `/docs/en/…`；指向仓库根的 `README.en.md` 这类 `.en.md` 文件同样算英文内容。
+v2 英文前缀固定为 `/en/…`，用户只维护两种语言的 `_sidebar.md`，修改后运行 update。旧 v1 未迁移时仍按旧发布布局校验；其壳形态英文页在 `/docs/en/…`。
 
 ## 默认信息架构
 
@@ -62,7 +62,7 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
 - sidebar 不是网站地图：CHANGELOG、LICENSE、SECURITY、内部 notes 是否进入取决于
   是否需要经常导航，文件存在 ≠ 必须出现在 sidebar
 
-## 语言侧边栏与 docsify
+## VitePress 语言与侧边栏
 
 - 每种语言一套 sidebar：`docs/_sidebar.md`（中文）与 `docs/en/_sidebar.md`（英文），
   各自只显示当前语言
@@ -71,14 +71,9 @@ error 影响退出码；warning 只提示（比如项目正在扩展分类，单
   不要把语言切换塞进 sidebar 分类树
 - 英文 sidebar 不放「伪英文入口」；确需 fallback 时必须标注（中文）/ Chinese only
 
-docsify **原生按页面所在目录取 `_sidebar.md`**：根页面读 `/_sidebar.md`，`/en/` 页面读
-`/en/_sidebar.md`。两种侧边栏都存在时**不需要 alias**。实测注意两个坑：
+VitePress config 导入生成 sidebar；保留分类、顺序与两级缩进，外链原样保留，Markdown 链接去掉 .md 后缀。README.md 通过 rewrites 成为首页。语言菜单使用 locales；有对应翻译时切到同一页面。应实际检查缺翻译时的回退行为，并补齐正文中的语言链接以避免 dead link。
 
-- 不要配置 `/.*/_sidebar.md` 之类的通配 alias「统一侧边栏」：docsify 先对 sidebar 请求路径
-  （`/en/_sidebar.md`）做 alias 改写再取文件，通配规则会把英文页面静默改写回中文侧边栏
-  （且 `/en/.*/_sidebar.md` 这类模式匹配不到 `/en/_sidebar.md` 本身，救不回来）
-- 外壳不要配置 `subMaxLevel` / `maxLevel`：它们会把**当前页面的标题**动态注入 sidebar 渲染，
-  等于把页内目录塞回导航里。需要页内目录时，在页面正文中自建 TOC 段落
+V2 不再使用 Docsify alias/subMaxLevel，GLOBAL_SIDEBAR_ALIAS 与 HEADING_INJECTION 仅在旧 v1 规则表中保留；页面目录由默认主题 outline 提供。本地搜索不依赖外部服务。
 
 ## 显式例外
 

@@ -54,6 +54,23 @@ export default {
           "link": "/en/QUICKSTART"
         }
       ]
+    },
+    {
+      "text": "Conventions",
+      "items": [
+        {
+          "text": "File Conventions",
+          "link": "/en/CONVENTIONS"
+        },
+        {
+          "text": "Navigation Contract",
+          "link": "/en/NAVIGATION"
+        },
+        {
+          "text": "Upgrade",
+          "link": "/en/UPGRADE"
+        }
+      ]
     }
   ]
 }

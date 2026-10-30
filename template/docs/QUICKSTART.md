@@ -9,6 +9,7 @@
 
 ## 提示
 
-- Markdown 直接生效，保存推送后文档站自动更新
-- 左侧导航编辑 `_sidebar.md`
+- Markdown 经 VitePress 构建发布；需要 Node.js 22+，先运行 `npm ci`
+- 左侧导航编辑 `_sidebar.md`，再运行 docsite 的 `update` 重新生成导航配置
+- 本地使用 `npm run docs:build` / `npm run docs:preview` 验收
 - 英文页面写到 `docs/en/` 下的同名文件

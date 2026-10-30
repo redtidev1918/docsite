@@ -7,8 +7,7 @@
 <!-- docsite: hand-written until the first release; the managed generator
      (update_download_page.py) rewrites this page once a release exists. -->
 
-> 本仓库没有安装包，也没有发布产物。docsite 就是一个 Python 脚本加一份模板，
-> 不需要 pip、npm、构建步骤，也不需要联网安装依赖。
+> 本仓库通过源码和模板分发。Python 管理层使用标准库；生成网站需要 Node.js 22+、npm ci 和 VitePress 构建。
 
 ## 获取方式
 
@@ -35,6 +34,8 @@ git -C /tmp/docsite checkout <commit>
 ```
 
 ## 接下来
+
+目标仓库初始化后运行 `npm ci`，再用 `npm run docs:build` / `npm run docs:preview` 验证网站。
 
 - [快速开始](/QUICKSTART.md)：把站点接到一个仓库上
 - [文件与命名规范](/CONVENTIONS.md)：下载页为什么由脚本生成而不是手写

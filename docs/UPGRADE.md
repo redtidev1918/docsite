@@ -1,29 +1,56 @@
 # 升级模板
 
-**语言 / Language:** 中文 · [English](/en/)
+**语言 / Language:** 中文 · [English](/en/UPGRADE.md)
 
-模板更新后（换 docsify 版本、改样式、加功能），在**每个接入仓库的根目录**执行：
+## 刷新 VitePress 托管文件
+
+需要 Python 3、Node.js 22+ 和 npm。在每个接入仓库的根目录执行：
 
 ```bash
 git -C /tmp/docsite pull          # 更新脚手架本体
 python3 /tmp/docsite/docsite.py update
+npm ci
+python3 /tmp/docsite/docsite.py build
+python3 /tmp/docsite/docsite.py preview
 ```
 
-`update` 只重写托管部分（`index.html`、`docs.yml`、`assets/vendor/`、下载页生成链路），
-按 `.docsite.json` 重新渲染，**Markdown 一律不碰**。看 diff、提交、推送。
+v2 `update` 下发 package.json/lock、config.mts、docs.yml、public/.nojekyll 与下载页链路，补齐 .gitignore，并从 `_sidebar.md` 重新生成 sidebar。**Markdown 一律不碰**。配置渲染源是 `.docsite.json`，不要手改生成的 config/sidebar。
 
-外壳目录按现状识别：`docs/index.html` 或老形态的 `.github/pages/index.html`（`static.yml`
-拼接发布的那批仓库）。托管外壳、vendor 资源与 `.nojekyll` 都跟着外壳目录走；
-`.docsite.json` 只声明了 `navigation` 时，站点名与 emoji 由 git remote 推导。
+**已有 Node 项目：根 package.json 和 lock 会被托管模板替换。** 首次接管非托管文件前会留下 `*.docsite.bak`；重复备份加序号，不覆盖原始备份。必须在 PR 审查中人工合并业务 scripts、依赖与锁文件，再安装和构建。合并自定义字段后，当前 `check` 的逐字节规则会报告 DRIFT，后续 update 也会再次下发模板；复杂 Node 工程须先评估此限制，不可直接合并覆盖业务配置的 PR。
 
-多个仓库批量升级就是在各仓库各跑一次，刻意不做「一键全仓升级」，让每个仓库的 diff
-可见可控。
+依赖升级：先修改模板 package.json 的固定版本并在 template/ 运行 `npm install` 更新模板 lock；目标仓库再运行 `update` 和 `npm ci`（人工合并依赖后使用 `npm install` 重算 lock）。v2 update 自动同步 `.docsite.json` 的 engineVersion/version。
 
-## 升级 Actions 版本
+## 从 Docsify 显式迁移
 
-`template/docs.yml` 是全账号 actions 版本的唯一来源。只改这一处模板，再让各仓库跑
-`update` 收敛；不要在单个仓库里手改，否则下次 `update` 会把它覆盖回模板版本，
-同一份版本号在仓库间反复漂移。
+迁移前提交或另存现有工作，确保 diff 与回滚基线明确。v1 在 migrate 前仍使用 Docsify 的 update/check/navcheck，不会被 update 静默切换引擎。
+
+```bash
+python3 /tmp/docsite/docsite.py migrate --dry-run
+python3 /tmp/docsite/docsite.py migrate
+npm ci
+python3 /tmp/docsite/docsite.py build
+python3 /tmp/docsite/docsite.py preview
+```
+
+- 仅识别带托管标记的 `docs/index.html` 或 `.github/pages/index.html`。
+- dry-run 不写盘，列出新增/改写、备份、旧 Pages workflow 停用和发布目录变化。
+- 旧外壳和 vendor 保留原件并备份；正文 hash 链接与旧 `/docs/` 前缀改写前备份，配置同样留备份。
+- `.github/pages/_sidebar.md` 仅在 docs/ 缺对应文件时复制，原侧边栏保留；**update 不改 Markdown，migrate 会显式改写链接**。
+- static.yml 等旧 Pages workflow 备份后停用，防止双部署；若含 `cp -R themes _site` 等额外发布任务，先人工拆分这些职责。根目录 Markdown 不再自动发布，按报告人工调整。
+- `.docsite.json` 保留原字段并写入 engine/engineVersion/version:2；下载页 `linkBase: "/docs"` 清空。
+- 下载页默认同时生成中英页；缺少被语言互链引用的页面会造成 dead link 构建失败，修复内容，不设置 ignoreDeadLinks。
+
+构建、预览和线上部署确认成功后，才进行**独立的人工清理**：旧 index.html、vendor、旧外壳目录与备份。迁移命令不会自动清理旧站点文件。
+
+## 回滚与上线顺序
+
+对未合并 PR，丢弃明确属于迁移的已跟踪改动，并从备份恢复未提交过的文件；新生成的未跟踪文件须逐一核对后移除，**仅 git checkout 不能清掉新文件**。已合并的迁移用 revert 提交回滚，并恢复旧部署 workflow。不要同时启用两套 Pages 部署。
+
+先合并并验证 docsite 自身站点；再选一个业务仓库试点，验证下载页真实 release → commit → dispatch → Pages；通过后逐个迁移 PixivFlow、DAViewer、TelePost。每仓库独立 PR，不自动合并或批量迁移。
+
+## 模板事实源
+
+v2 Pages workflow 源为 `template/.github/workflows/docs.yml`，Node 22 → npm ci → VitePress → dist 上传；v1 保留 `template/docs.yml` 与旧外壳模板供兼容。修改对应模板后由 update 下发，不在目标生成文件里手改。
 
 ## 相关校验
 

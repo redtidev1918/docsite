@@ -2,31 +2,32 @@
 
 > 每次会话结束或阶段性进展后更新本文件。先读这里,再读 [PLAN.md](PLAN.md) 和 [TASKS.md](TASKS.md)。
 
-**最后更新:** 2026-10-30(阶段 3 完成)
+**最后更新:** 2026-10-30(阶段 3/4 完成,阶段 5 待 PR 审查与合并上线)
 
 ## 项目健康度
 
 | 项 | 状态 |
 | --- | --- |
-| 分支 | `feat/vitepress-engine`(阶段 1 已完成待提交合入);`main` @7c19a4e;归档 `archive/docsify-custom-theme`(@db1916f) |
-| 测试 | 19 个基线测试通过(Docsify 链路断言仍有效);VitePress 新测试待阶段 4 |
-| 构建 | docsite 自身 VitePress 1.6.4 构建成功(zh+en);CI Node 22 构建待推送验证 |
+| 分支 | `feat/vitepress-engine`;阶段 1–4 已提交;归档 `archive/docsify-custom-theme`(@db1916f) |
+| 测试 | 60 例通过(1 skip),v1 兼容断言保持通过 |
+| 构建 | npm ci + Node 22.23.4 构建成功(zh+en),无 dead link;远端 PR CI 待验证 |
 | 下游站点 | PixivFlow · DAKit · DAViewer · TelePost · ReleaseGraph 仍在 Docsify(阶段 5 逐个迁移);docsite 自身已切 VitePress(试验田) |
 
 ## 当前阶段
 
-**阶段 1、2、3 ✅ 完成;阶段 4 质量门禁进行中。**
+**阶段 1–4 ✅ 完成;阶段 5 中英文档与 PR 校验 workflow 完成。**
 
 - 阶段 3:init v2/update 引擎感知/check v2/migrate/build-preview-dev 完成,模板内容移入 template/docs/。
-- 测试现状:58 例通过(1 skip);自身 update 保留全部 11 个 Markdown 的 SHA-256;自身与旧壳迁移 fixture 构建成功。
+- 测试:60 例通过(1 skip),自身与旧壳迁移 fixture 构建成功,最终无 .git 副本 check 9/9、navcheck 全绿。
+- 浏览器:36 张最终文档截图+搜索截图;72 次亮暗/宽度组合无整体横向滚动,子路径无资源错误。报告见 shots/report.json。
 
 ## 下一步
 
-1. 阶段 3 已验收,无 .git fixture 的 check/navcheck 全绿。
-2. 阶段 4 质量门禁(截图矩阵有 IAB 超时坑,提示词 §3 给了对策)
-3. 阶段 5 文档与上线
+1. 审查并合并 docsite PR,确认 Node 22 CI 与真实 Pages 发布。
+2. 验证 release → 双语下载页 → 显式 dispatch → Pages 的真实链路。
+3. 用户已指定上线后重建六站:DAViewer、DeviantDrop、deviantart-downloader、PixivFlow、TelePost、NekoTime。先试点一个,再逐仓库独立 PR。
 
 ## 进行中 / 阻塞
 
-- 进行中:阶段 3 收尾(已交接)
-- 无阻塞;后台或残留 vitepress preview(4173 端口),无需处理
+- 进行中:阶段 5 PR 交付;正式上线依赖所有者合并。
+- 旧 preview(4173)已关闭,其占用 esbuild 导致的 npm ci EPERM 已修复并重装成功。截图使用系统 Edge。
