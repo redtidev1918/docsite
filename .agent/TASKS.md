@@ -14,11 +14,11 @@
 
 ## 阶段 2 — 兼容现有文档规范
 
-- ⬜ 2-1 `rewrites` 实现 `README.md→index.md`、`en/README.md→en/index.md`
-- ⬜ 2-2 `_sidebar.md` → `sidebar.generated.mjs` 转换器(Python,保留分类/排序/缩进/语言隔离;update 时重新生成)
-- ⬜ 2-3 VitePress `locales`(root zh-CN / en);语言切换优先对应翻译页,无翻译回退语言首页
-- ⬜ 2-4 下载页生成链路回归(`download-page.py` 原样保留,输出路径/链接在新路由下可用)
-- ⬜ 2-5 navcheck 升级:Docsify 专属规则(alias/subMaxLevel)退役,改为 VitePress 路由校验(sidebar 目标、.md 链接、双语镜像)
+- ✅ 2-1 `rewrites` 实现 `README.md→index.md`、`en/README.md→en/index.md`
+- ✅ 2-2 `_sidebar.md` → `sidebar.generated.mjs` 转换器(Python,保留分类/排序/缩进/语言隔离;update 时重新生成)
+- ✅ 2-3 VitePress `locales`(root zh-CN / en);语言切换优先对应翻译页,无翻译回退语言首页
+- ✅ 2-4 下载页生成链路回归(`download-page.py` 原样保留,输出路径/链接在新路由下可用)
+- ✅ 2-5 navcheck 升级:Docsify 专属规则(alias/subMaxLevel)退役,改为 VitePress 路由校验(sidebar 目标、.md 链接、双语镜像)
 
 ## 阶段 3 — 迁移与升级管理
 

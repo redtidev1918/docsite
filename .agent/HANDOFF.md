@@ -17,6 +17,15 @@
 
 ---
 
+## 2026-10-30 · 阶段 2:兼容现有文档规范完成
+
+- **进行中:** TASKS.md → 阶段 3(迁移与升级管理)。
+- **已完成:** docsite.py 新增 `_vp_link`/`_vitepress_sidebar`/`sidebar_module_text`/`write_sidebars`(sidebar 转换器,两级分类保留、.md 去后缀、外部链接原样、确定性输出)+ `render_config`(config.mts 单引号 JS 转义 + `@@BASE@@` 由 repo 推导,.github.io 仓库为 '/')+ `is_vitepress` 引擎识别;navcheck 重写为引擎感知双规则表(v2:BROKEN_SIDEBAR_LINK 按 docs/ 存在性、SIDEBAR_STALE 校 sidebar.generated.mjs ↔ _sidebar.md 一致性;v1 规则原样保留兼容存量仓库);config.mts 模板补齐双语 nav(首页/下载/GitHub)、中文 UI 文案(outline/docFooter/搜索框——VitePress 1.6.4 默认主题不随 lang 自动切换,需显式配置)、本地搜索中文化;write_file 补 `newline=""`(提示词描述的 LF 字节稳定,原代码缺失);新增 tests/test_vitepress_config.py(17 例)。
+- **已验证:** 36 测试全绿;真实浏览器:中文首页侧边栏(开始/规范)、nav、搜索按钮「搜索文档」;英文页侧边栏只含 English 树(隔离);语言切换 QUICKSTART → en/QUICKSTART(对应翻译页);清 performance 缓冲后 0 个 404 资源;navcheck v2 对 docsite 真实内容 fixture 全绿(feature 分支本地自动跳过属设计,CI 在 main 跑)。
+- **未验证:** CI 上的 navcheck/check(Push 后)。
+- **偏差/取证:** ① 下载页生成器零改动——linkBase 为空时输出根绝对 `.md` 链接,VitePress 构建期自动重写(已在 dist 验证);**migrate 时需把旧壳仓库 download-page.json 的 `linkBase: "/docs"` 清为 ""**(记录到阶段 3);② 默认主题 UI 不随 lang 自动汉化(实证),故在模板显式配置中文文案,与旧 Docsify 壳搜索文案一致(搜索文档…/没有匹配的结果);③ 若某仓库只生成 zh 下载页而 lang_line 链接 `/en/download.md`,VitePress 会因 dead link 构建失败——这是期望的显性失败,不设 ignoreDeadLinks。
+- **下一步:** TASKS.md → 3-1 migrate 命令。
+
 ## 2026-10-30 · 阶段 1:VitePress 基础集成完成(docsite 自身试验田)
 
 - **进行中:** TASKS.md → 阶段 2(兼容现有文档规范)。

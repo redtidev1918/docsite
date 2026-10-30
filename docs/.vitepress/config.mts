@@ -3,6 +3,8 @@
 // 其余 token 来自 .docsite.json。侧边栏由 _sidebar.md 生成(sidebar.generated.mjs),不在本文件维护。
 import { defineConfig } from 'vitepress'
 
+const sidebar = (await import('./sidebar.generated.mjs')).default
+
 export default defineConfig({
   lang: 'zh-CN',
   title: '🛠️ docsite',
@@ -27,16 +29,53 @@ export default defineConfig({
     root: {
       label: '简体中文',
       lang: 'zh-CN',
+      themeConfig: {
+        nav: [
+          { text: '首页', link: '/' },
+          { text: '📥 下载', link: '/download' },
+          { text: 'GitHub', link: 'https://github.com/redtidev1918/docsite' },
+        ],
+        outline: { label: '本页目录' },
+        docFooter: { prev: '上一页', next: '下一页' },
+        returnToTopLabel: '回到顶部',
+        sidebarMenuLabel: '菜单',
+        darkModeSwitchLabel: '主题',
+        lightModeSwitchTitle: '切换到浅色主题',
+        darkModeSwitchTitle: '切换到深色主题',
+      },
     },
     en: {
       label: 'English',
       lang: 'en-US',
       link: '/en/',
+      themeConfig: {
+        nav: [
+          { text: 'Home', link: '/en/' },
+          { text: '📥 Download', link: '/en/download' },
+          { text: 'GitHub', link: 'https://github.com/redtidev1918/docsite' },
+        ],
+      },
     },
   },
   themeConfig: {
+    sidebar,
     search: {
       provider: 'local',
+      options: {
+        locales: {
+          root: {
+            translations: {
+              button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+              modal: {
+                displayDetails: '显示详情',
+                resetButtonTitle: '清除查询条件',
+                noResultsText: '没有匹配的结果',
+                footer: { selectText: '选择', navigateText: '切换', closeText: '关闭' },
+              },
+            },
+          },
+        },
+      },
     },
   },
 })

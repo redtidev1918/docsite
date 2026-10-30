@@ -80,6 +80,104 @@ def render(text, cfg):
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
 
 
+# ---------------------------------------------------------------------------
+# VitePress(v2 引擎)托管文件的渲染与生成。
+# config.mts 的 token 全部处于 JS 单引号字符串上下文,一律转义(D-005:
+# 未校验的用户字符串不得拼进 JS);base 由 repo 推导,不接受配置覆盖。
+VP_CONFIG_REL = Path("docs/.vitepress/config.mts")
+VP_SIDEBAR_REL = Path("docs/.vitepress/sidebar.generated.mjs")
+VP_SIDEBAR_HEADER = (
+    "// docsite: managed file — generated from _sidebar.md, do not edit.\n"
+    "// 导航只维护 docs/_sidebar.md 与 docs/en/_sidebar.md;"
+    "运行 `python3 docsite.py update` 会按它们重新生成本文件。\n"
+)
+
+
+def _js_escape(s):
+    """JS 单引号字符串上下文的最小转义(config.mts 里的 '@@TOKEN@@')。"""
+    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\r", "").replace("\n", "\\n")
+
+
+def _base_for(repo):
+    """GitHub Pages 路径:用户/组织站点 <owner>.github.io 部署在根,其余挂 /<repo>/。"""
+    name = repo.split("/")[-1]
+    return "/" if name.endswith(".github.io") else f"/{name}/"
+
+
+def render_config(text, cfg):
+    """渲染 config.mts 模板;token 值先过单引号转义再进模板。"""
+    tokens = {
+        "NAME": cfg["name"],
+        "EMOJI": cfg["emoji"],
+        "DESCRIPTION": cfg.get(
+            "description",
+            f"{cfg['name']} 文档中心。内容直接来自仓库里的 Markdown，与代码同步更新。",
+        ),
+        "REPO": cfg["repo"],
+        "BASE": _base_for(cfg["repo"]),
+    }
+    def sub(m):
+        return _js_escape(tokens[m.group(1)])
+    return re.sub(r"@@([A-Z_]+)@@", sub, text)
+
+
+def _vp_link(target):
+    """Docsify 侧边栏链接 → VitePress 路由:根绝对 .md 去后缀;外部链接原样。"""
+    if target is None or _is_external(target):
+        return target
+    page, _, anchor = target.partition("#")
+    if page.endswith(".md"):
+        page = page[: -len(".md")]
+    return f"{page}#{anchor}" if anchor else page
+
+
+def _vitepress_sidebar(items):
+    """_sidebar_items() 的条目 → VitePress SidebarItem 树。
+
+    规范形态是两级:顶级分类(无链接)成组,其余条目为叶子归入最近的组;
+    更深的层级按同规则嵌套(防御性处理,规范本身不使用)。
+    """
+    root = []
+    stack = [root]
+    for indent, label, target in items:
+        depth = min(indent, len(stack) - 1)
+        del stack[depth + 1:]
+        if target is None:
+            group = {"text": label, "items": []}
+            stack[depth].append(group)
+            stack.append(group["items"])
+        else:
+            stack[depth].append({"text": label, "link": _vp_link(target)})
+    return root
+
+
+def sidebar_module_text(root):
+    """由 docs/_sidebar.md(+ docs/en/_sidebar.md)生成 sidebar.generated.mjs 全文。"""
+    root = Path(root)
+    tree = {}
+    for prefix, rel in (("/", "docs/_sidebar.md"), ("/en/", "docs/en/_sidebar.md")):
+        path = root / rel
+        if path.is_file():
+            tree[prefix] = _vitepress_sidebar(
+                _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")))
+    return (VP_SIDEBAR_HEADER
+            + "export default " + json.dumps(tree, ensure_ascii=False, indent=2) + "\n")
+
+
+def write_sidebars(root="."):
+    """重新生成 docs/.vitepress/sidebar.generated.mjs(init/update 与迁移时调用)。"""
+    root = Path(root)
+    dst = root / VP_SIDEBAR_REL
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    write_file(dst, sidebar_module_text(root), overwrite=True)
+    return dst
+
+
+def is_vitepress(root):
+    """仓库是否已是 VitePress(v2)形态:以 config.mts 在场为准(比配置字段更实在)。"""
+    return (Path(root) / VP_CONFIG_REL).is_file()
+
+
 def origin_slug():
     """从 git remote 推断 owner/name；老仓库的 .docsite.json 可能只声明 navigation。"""
     try:
@@ -138,7 +236,8 @@ def write_file(path, text, overwrite):
     if path.exists() and not overwrite:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    # newline="":不做平台换行翻译,托管文件跨平台字节一致(SYNCED 依赖这一点)
+    path.write_text(text, encoding="utf-8", newline="")
     return True
 
 
@@ -479,6 +578,43 @@ def _check_sidebar_targets(name, path, root, issues, published):
                            f"「{label}」-> `{target}` 在站点里不存在（未发布的路径）", "error"))
 
 
+def _check_vp_targets(name, path, root, issues):
+    """v2(VitePress):侧边栏链接必须指向 docs/ 下真实存在的页面。
+
+    路由对照:rewrites 把 README.md 映射为 index,故 `/` 查 docs/README.md、
+    `/en/` 查 docs/en/README.md;`.md` 后缀可有可无(转换器已去后缀)。
+    """
+    root = Path(root)
+    for _indent, label, target in _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")):
+        if target is None or _is_external(target):
+            continue
+        page = target.split("#")[0]
+        if not page.startswith("/"):
+            continue  # 相对链接交给 NOT_ROOT_ABSOLUTE 提示
+        rel = page.strip("/")
+        if rel in ("", "en"):
+            ok = (root / "docs" / rel / "README.md").is_file()
+        else:
+            if not rel.endswith(".md"):
+                rel += ".md"
+            ok = (root / "docs" / rel).is_file()
+        if not ok:
+            issues.append((name, "BROKEN_SIDEBAR_LINK",
+                           f"「{label}」-> `{target}` 在 docs/ 下不存在（VitePress 路由）", "error"))
+
+
+def _check_sidebar_consistency(name, root, issues):
+    """v2:sidebar.generated.mjs 必须与 _sidebar.md 的再生成结果逐字一致。"""
+    got = Path(root) / VP_SIDEBAR_REL
+    if not got.is_file():
+        issues.append((name, "SIDEBAR_STALE",
+                       f"缺少 {VP_SIDEBAR_REL}；运行 update 重新生成", "error"))
+        return
+    if got.read_text(encoding="utf-8", errors="ignore") != sidebar_module_text(root):
+        issues.append((name, "SIDEBAR_STALE",
+                       "sidebar.generated.mjs 与 _sidebar.md 不一致；运行 update 重新生成", "error"))
+
+
 def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
     text = path.read_text(encoding="utf-8", errors="ignore")
     items = _sidebar_items(text)
@@ -543,23 +679,22 @@ def _navcheck_sidebar(name, path, is_en, cfg, issues, en_prefix="/en/"):
 def cmd_navcheck(args):
     """校验导航信息架构规约（确定性规则；主观的「分类好不好」不在检查范围）。
 
-    error（返回非零）：
+    规则表按引擎分两套（D-009 迁移期双轨，migrate 完成后 Docsify 表退役）：
+
+    v2（VitePress，docs/.vitepress/config.mts 在场）error：
       COMBINED_LOCALES   根 sidebar 出现 /en/ 文档树（语言是站点维度，不是导航分类）
       EN_SIDEBAR_MISSING 有 docs/en/ 页面但缺 docs/en/_sidebar.md
-      ANCHOR_LINK        sidebar 出现页内锚点（首页目录混入导航；可用
-                         .docsite.json navigation.allowSidebarAnchors 显式豁免）
+      ANCHOR_LINK        sidebar 出现页内锚点（可用 navigation.allowSidebarAnchors 豁免）
       DUPLICATE_LINK     同一目标在同一 sidebar 出现多次
-      BROKEN_SIDEBAR_LINK 侧边栏链接指向站点里不存在的页面（按实际发布路径判定：
-                         新形态站点根是 docs/，老形态是 .github/pages + 根 *.md + docs/）
-      GLOBAL_SIDEBAR_ALIAS  index.html 用 '/.*/_sidebar.md' 通配 alias 强制根侧边栏
-                         （破坏分语言导航，docsify 原生按目录解析即可，无需 alias）
-      NAVIGATION_SCHEMA  .docsite.json 的 navigation 字段非法（未知字段 / 非布尔值 /
-                         非法 JSON）——白名单制，不给万能逃生口
-    warning（仅提示，不影响退出码）：
-      SINGLE_PAGE_CATEGORY 顶级分类只有 1 个页面
-      NOT_ROOT_ABSOLUTE   本地链接未用根绝对路径
-      EN_SIDEBAR_ZH_LINK  英文 sidebar 指向中文页面且未标注（中文）
-      HEADING_INJECTION   index.html 配置 subMaxLevel，页内标题被注入 sidebar 渲染
+      BROKEN_SIDEBAR_LINK 侧边栏链接在 docs/ 下不存在（路由对照：/ ↔ README.md）
+      SIDEBAR_STALE      sidebar.generated.mjs 与 _sidebar.md 再生成结果不一致
+      NAVIGATION_SCHEMA  .docsite.json navigation 字段非法（白名单制）
+
+    v1（Docsify，未迁移仓库，规则保持原样以兼容存量）error 额外有：
+      GLOBAL_SIDEBAR_ALIAS / HEADING_INJECTION（docsify 外壳专属，v2 下无此文件）
+      BROKEN_SIDEBAR_LINK 按发布路径判定（壳形态 .github/pages + 根 *.md + docs/）
+
+    warning（两套共用）：SINGLE_PAGE_CATEGORY / NOT_ROOT_ABSOLUTE / EN_SIDEBAR_ZH_LINK
     例外必须写入仓库 .docsite.json 的 navigation 字段，检查器不静默忽略。
     """
     if args.all:
@@ -600,26 +735,32 @@ def cmd_navcheck(args):
             _navcheck_sidebar(f"{root.name}/en", en, is_en=True, cfg=cfg, issues=issues,
                               en_prefix=en_prefix)
 
-        published = published_paths(root)
-        _check_sidebar_targets(root.name, zh, root, issues, published)
-        if en.is_file():
-            _check_sidebar_targets(f"{root.name}/en", en, root, issues, published)
+        if is_vitepress(root):
+            _check_vp_targets(root.name, zh, root, issues)
+            if en.is_file():
+                _check_vp_targets(f"{root.name}/en", en, root, issues)
+            _check_sidebar_consistency(root.name, root, issues)
+        else:
+            published = published_paths(root)
+            _check_sidebar_targets(root.name, zh, root, issues, published)
+            if en.is_file():
+                _check_sidebar_targets(f"{root.name}/en", en, root, issues, published)
 
-        # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
-        # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。
-        for shell in (root / "docs/index.html", root / ".github/pages/index.html"):
-            if not shell.is_file():
-                continue
-            stext = shell.read_text(encoding="utf-8", errors="ignore")
-            # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
-            if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
-                issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
-                               f"{shell.relative_to(root)} 配置了 '/.*/_sidebar.md' 通配 alias，"
-                               "会把 /en/ 页面静默改写回根侧边栏，破坏分语言导航", "error"))
-            if re.search(r"subMaxLevel\s*:", stext):
-                issues.append((root.name, "HEADING_INJECTION",
-                               f"{shell.relative_to(root)} 配置了 subMaxLevel，"
-                               "当前页标题会被注入 sidebar 渲染", "warning"))
+            # 明显旧结构：外壳配置检查（确定性）。外壳可能在 docs/，也可能在
+            # .github/pages/（老仓库由 static.yml 拼接发布），两处都查。
+            for shell in (root / "docs/index.html", root / ".github/pages/index.html"):
+                if not shell.is_file():
+                    continue
+                stext = shell.read_text(encoding="utf-8", errors="ignore")
+                # 匹配真实配置形态（键: 值），避免把文档/注释里的反例文字误报
+                if re.search(r"/\.\*/_sidebar\.md\s*['\"]\s*:\s*['\"]/_sidebar\.md", stext):
+                    issues.append((root.name, "GLOBAL_SIDEBAR_ALIAS",
+                                   f"{shell.relative_to(root)} 配置了 '/.*/_sidebar.md' 通配 alias，"
+                                   "会把 /en/ 页面静默改写回根侧边栏，破坏分语言导航", "error"))
+                if re.search(r"subMaxLevel\s*:", stext):
+                    issues.append((root.name, "HEADING_INJECTION",
+                                   f"{shell.relative_to(root)} 配置了 subMaxLevel，"
+                                   "当前页标题会被注入 sidebar 渲染", "warning"))
 
         if not issues:
             print(f"✅ {root.name}")
