@@ -6,7 +6,7 @@
 
 ## P0 — 设计系统与核心体验
 
-- ⬜ P0-1 现状审计:完整阅读 `docsite.py`(init/update/check/navcheck)、`template/`、`tests/`、`docs/*.md`(README/QUICKSTART/CONVENTIONS/NAVIGATION/UPGRADE),列出工具托管文件与用户文件清单
+- ✅ P0-1 现状审计:完整阅读 `docsite.py`(init/update/check/navcheck)、`template/`、`tests/`、`docs/*.md`(README/QUICKSTART/CONVENTIONS/NAVIGATION/UPGRADE),列出工具托管文件与用户文件清单 → 产出 [AUDIT.md](AUDIT.md);19 测试基线全过
 - ⬜ P0-2 建立 `template/assets/styles/`:`tokens.css`(色彩/字体/间距/圆角/阴影/断点变量)、`themes.css`(亮暗语义色,`prefers-color-scheme` + 手动覆盖)
 - ⬜ P0-3 `layout.css` + `components.css`:正文排版(H1–H6/代码块/表格/提示框/图片)、阅读宽度、侧边栏、移动端断点
 - ⬜ P0-4 `template/assets/scripts/theme.js`:主题切换迁移出 `index.html` 内联脚本,无闪白、localStorage 兼容既有偏好

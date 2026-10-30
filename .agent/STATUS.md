@@ -15,16 +15,16 @@
 
 ## 当前阶段
 
-**视觉设计与文档体验系统级升级:规划完成,尚未开始实施。**
+**视觉升级 P0 实施中:P0-1 现状审计已完成,产出 [AUDIT.md](AUDIT.md)。**
 
-- 方案已由仓库所有者确认(范围 P0 + P1),完整计划见 [PLAN.md](PLAN.md)
-- 决策已固化为 [DECISIONS.md](DECISIONS.md) D-001 ~ D-005
-- 仓库代码尚未做任何升级相关改动
+- 19 个现有测试全过(基线 @ `main` 9dd3caa)
+- 关键结论:新增 `assets/styles|scripts` 是纯叠加改动;雷区在 navcheck 规则(alias/subMaxLevel/锚点)与下载页测试断言
+- 遗留决策 D-006(主题策略)、D-007(Hero 路径)待进入 P0-2 前敲定,倾向已写进 AUDIT §9
 
 ## 下一步
 
-1. 执行 [TASKS.md](TASKS.md) P0-1「现状审计」:完整阅读 `docsite.py`、`template/`、`tests/`、`docs/*.md`,确认工具托管文件与用户文件的边界
-2. 之后按 TASKS.md 顺序推进 P0 → P1
+1. 确认 AUDIT §9 两个决策,写入 [DECISIONS.md](DECISIONS.md)
+2. 执行 [TASKS.md](TASKS.md) P0-2(tokens.css / themes.css)
 
 ## 进行中 / 阻塞
 
