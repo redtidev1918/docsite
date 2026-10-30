@@ -6,11 +6,11 @@
 
 ## 阶段 1 — VitePress 基础集成
 
-- ⬜ 1-1 `template/package.json` + 提交 `package-lock.json`(固定 VitePress 版本,记录到 `engineVersion`)
-- ⬜ 1-2 `template/docs/.vitepress/config.mts` 模板:`base` 动态渲染(仓库名)、默认主题、亮暗、本地搜索、`.nojekyll` 经 `public/` 保留
-- ⬜ 1-3 `template/.github/workflows/docs.yml` 改造:Node 22 → `npm ci` → `vitepress build` → 上传 `docs/.vitepress/dist`(保留权限/并发/触发分支)
-- ⬜ 1-4 docsite 自身作为试验田接入(临时双轨:新 workflow 构建验证通过后再切换)
-- ⬜ 1-5 本地 `vitepress build` + 真实浏览器验收;子路径下无资源 404
+- ✅ 1-1 `template/package.json` + 提交 `package-lock.json`(固定 VitePress 版本,记录到 `engineVersion`)
+- ✅ 1-2 `template/docs/.vitepress/config.mts` 模板:`base` 动态渲染(仓库名)、默认主题、亮暗、本地搜索、`.nojekyll` 经 `public/` 保留
+- ✅ 1-3 `template/.github/workflows/docs.yml` 改造:Node 22 → `npm ci` → `vitepress build` → 上传 `docs/.vitepress/dist`(保留权限/并发/触发分支)
+- ✅ 1-4 docsite 自身作为试验田接入(临时双轨:新 workflow 构建验证通过后再切换;旧壳文件已清理)
+- ✅ 1-5 本地 `vitepress build` + 真实浏览器验收;子路径下无资源 404(截图补录推迟到阶段 4 视觉门禁)
 
 ## 阶段 2 — 兼容现有文档规范
 

@@ -17,6 +17,16 @@
 
 ---
 
+## 2026-10-30 · 阶段 1:VitePress 基础集成完成(docsite 自身试验田)
+
+- **进行中:** TASKS.md → 阶段 2(兼容现有文档规范)。
+- **已完成:** `feat/vitepress-engine` 分支上:template/package.json(vitepress 锁 1.6.4)+ 提交 package-lock.json(lockfileVersion 3);template/docs/.vitepress/config.mts(@@TOKEN@@ 模板,base/title/description/亮暗/本地搜索/locales 骨架/srcExclude _sidebar/rewrites README→index);template/.github/workflows/docs.yml(Node 22 + npm ci + build + dist 上传);docsite 自身接入(根 package.json/lock、docs/.vitepress/config.mts 渲染版 base '/docsite/'、docs/public/.nojekyll);删除旧壳 docs/index.html、docs/assets/、docs/.nojekyll(构建通过后清理);.docsite.json 加 engine/engineVersion;.gitignore 加 node_modules/dist/cache。
+- **已验证:** `npm run docs:build` 成功(zh+en 全部页面,dist 结构正确);`vitepress preview` + 真实浏览器(IAB):首页/英文页渲染、`.md` 链接正确解析为 `/docsite/*.html`、本地搜索弹窗可用(查询 download 返回结果)、亮暗切换生效(html.dark 翻转)、performance API 确认子路径下 0 个 404 资源;19 个既有 Python 测试通过。
+- **未验证:** 截图(IAB 截图表面超时,面板后台;阶段 4 视觉门禁补);CI 上的 Node 22 构建(推送后验证)。
+- **偏差/取证:** ① 旧 docs/index.html 在场时 VitePress 构建照常成功且 dist/index.html 是 VitePress 生成版——migrate 可以「备份→构建→再清理」,不必先删;② docs/assets 未被复制进 dist(未引用的 srcDir 文件不发布),双轨并存无污染;③ rewrites 从阶段 1 就启用(无它首页 404,提示词将其归阶段 2,提前属必要);④ workflow 触发 paths 增加 package.json/package-lock.json(依赖变化也该触发构建)。
+- **风险/注意:** docsite.py 尚未改造——在 docsite 自身运行旧 `update` 会重新下发 Docsify index.html(阶段 3 修复前不要在本仓库跑 update);npm 本地版本 24,CI 用 Node 22(setup-node 固定,无兼容问题)。
+- **下一步:** TASKS.md → 2-1(rewrites 已就位)/2-2 sidebar 转换器。
+
 ## 2026-10-30 · 架构转向:VitePress 迁移(D-009),自研主题归档
 
 - **进行中:** 无代码任务;VitePress 迁移待新会话按 [PROMPT_VITEPRESS_MIGRATION.md](PROMPT_VITEPRESS_MIGRATION.md) 启动。
