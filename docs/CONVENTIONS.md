@@ -90,6 +90,7 @@ README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md`
 
 - `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
 - `previewFile`：手写预览片段，存在时注入第一语言页（默认中文，放应用截图等）
+- `previewFiles`：按语言指定预览片段，如 `{"en":"docs/en/download-preview.md"}`；对应语言优先使用这份文件
 - `linkBase`：v2 使用 `""`，由 VitePress base 处理仓库子路径；`"/docs"` 仅适用于旧 v1 拼接发布，迁移时会清空
 - `languages` / `outputs`：默认 `["zh","en"]` 与固定路径；自定义路径必须同时满足页面互链与导航，缺翻译页时构建会因 dead link 失败
 - `trackPrerelease`：默认 `false`，pre-release 不覆盖 stable 页面

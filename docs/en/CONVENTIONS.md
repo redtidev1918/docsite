@@ -43,6 +43,8 @@ TrackPrerelease defaults to false. DocsWorkflow defaults to docs.yml. Pass `--ta
 
 Binary assets are grouped by platform with stable latest-download links and checksums. Package-only projects document registry installation instead of inventing binaries. GITHUB_TOKEN-created releases must use workflow_call or workflow_dispatch; release:published is the fallback. After changed pages are committed, the workflow explicitly dispatches docs.yml because its GITHUB_TOKEN push does not trigger push-based deployment.
 
+`previewFiles` selects a preview for each language, for example `{"en":"docs/en/download-preview.md"}`. It takes precedence over previewFile for that language.
+
 ## Deployment
 
 One active Pages workflow per repository. V2 docs.yml runs Node 22 → npm ci → npm run docs:build → uploads docs/.vitepress/dist → deploys Pages. Public/.nojekyll is copied into dist; root Markdown is not automatically published. The deployment branch matches .docsite.json.
