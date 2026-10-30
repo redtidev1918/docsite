@@ -15,7 +15,7 @@ on:
       - 'docs/**'
       - '.github/workflows/docs.yml'
       - 'package.json'
-      - 'package-lock.json'
+      - 'package-lock.json'@@CONTENT_PATHS@@
 
 permissions:
   contents: read

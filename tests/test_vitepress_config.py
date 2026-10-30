@@ -5,6 +5,7 @@
 navcheck 校验它与再生成结果逐字一致。config.mts 的 token 处于 JS 字符串
 上下文,渲染必须转义(D-005);base 由仓库名推导,不接受配置覆盖。
 """
+import json
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,15 @@ EN_SIDEBAR = "- Docs\n  - [Home](/en/)\n  - [Quick Start](/en/QUICKSTART.md)\n"
 
 
 class ConfigSafetyTestCase(unittest.TestCase):
+    def test_extra_content_paths_are_quoted_and_optional(self):
+        template = "paths:\n      - 'package-lock.json'@@CONTENT_PATHS@@\n"
+        self.assertEqual(docsite.render(template, CFG), "paths:\n      - 'package-lock.json'\n")
+        cfg = dict(CFG, contentPaths=['*.md', 'themes/**', '.github/scripts/*docs.mjs'])
+        docsite.validate_config(cfg)
+        rendered = docsite.render(template, cfg)
+        for value in cfg['contentPaths']:
+            self.assertIn('      - ' + json.dumps(value), rendered)
+
     def test_json_escaping_handles_both_quote_contexts(self):
         value = '"; throw new Error("injected"); //\n\t'
         rendered = docsite.render_config("'@@NAME@@' \"@@EMOJI@@\"", dict(CFG, name=value, emoji=value))
@@ -132,6 +142,15 @@ class RenderConfigTestCase(unittest.TestCase):
 
 
 class NavcheckV2TestCase(unittest.TestCase):
+    def test_retained_legacy_shell_does_not_change_v2_locale_prefix(self):
+        shell = self.root / '.github/pages/index.html'
+        shell.parent.mkdir(parents=True)
+        shell.write_text('<!-- docsite: managed file -->', encoding='utf-8')
+        docsite.write_sidebars(self.root)
+        run = self.run_navcheck()
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertNotIn('EN_SIDEBAR_ZH_LINK', run.stdout)
+
     """v2(VitePress)navcheck:BROKEN_SIDEBAR_LINK 按 docs/ 存在性;SIDEBAR_STALE 校一致性。"""
 
     def setUp(self):

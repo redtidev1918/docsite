@@ -83,6 +83,8 @@ def render(text, cfg):
         "THEME_KEY": cfg.get("themeKey", ""),
         "REPO": cfg["repo"],
         "BRANCH": cfg.get("branch", "main"),
+        "CONTENT_PATHS": "".join("\n      - " + json.dumps(path, ensure_ascii=False)
+                                 for path in cfg.get("contentPaths", [])),
     }
     def sub(m):
         return tokens[m.group(1)]
@@ -318,13 +320,13 @@ def origin_slug():
 def validate_config(cfg):
     """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
     allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
-               "version", "engine", "engineVersion", "navigation", "packageMode"}
+               "version", "engine", "engineVersion", "navigation", "packageMode", "contentPaths"}
     if not isinstance(cfg, dict):
         raise ValueError(".docsite.json 必须是对象")
     unknown = set(cfg) - allowed
     if unknown:
         raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
-    for key in allowed - {"version", "navigation"}:
+    for key in allowed - {"version", "navigation", "contentPaths"}:
         if key in cfg and not isinstance(cfg[key], str):
             raise ValueError(f".docsite.json {key} 必须是字符串")
     if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
@@ -337,6 +339,9 @@ def validate_config(cfg):
         raise ValueError("engine 必须是 docsify 或 vitepress")
     if cfg.get("packageMode", "managed") not in ("managed", "merge"):
         raise ValueError("packageMode 必须是 managed 或 merge")
+    paths = cfg.get("contentPaths", [])
+    if not isinstance(paths, list) or any(not isinstance(p, str) or not p or "\n" in p or "\r" in p for p in paths):
+        raise ValueError("contentPaths 必须是非空单行路径字符串组成的数组")
     nav = cfg.get("navigation", {})
     if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
                                          or not isinstance(v, bool) for k, v in nav.items()):
@@ -1195,7 +1200,8 @@ def cmd_navcheck(args):
         checked += 1
         cfg, schema_problems = _nav_config(root)
         # 英文内容的前缀跟着发布布局走：壳形态在 /docs/en/，新形态在 /en/。
-        en_prefix = "/docs/en/" if (root / ".github" / "pages" / "index.html").is_file() else "/en/"
+        en_prefix = ("/docs/en/" if not is_vitepress(root)
+                     and (root / ".github/pages/index.html").is_file() else "/en/")
         issues = []
         for problem in schema_problems:
             issues.append((root.name, "NAVIGATION_SCHEMA", problem, "error"))
