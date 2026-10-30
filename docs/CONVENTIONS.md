@@ -10,7 +10,7 @@ Python 脚本更新配置和检查文件，VitePress 构建网站。构建前需
 
 | 类别 | 文件 | 更新规则 |
 | :-- | :-- | :-- |
-| 托管依赖 | package.json / package-lock.json | 按模板下发，Node 工程的自定义字段须人工合并 |
+| 托管依赖 | package.json / package-lock.json | 默认按模板下发；packageMode: merge 保留 Node 工程字段 |
 | 托管渲染 | docs/.vitepress/config.mts、.github/workflows/docs.yml | 从 .docsite.json 渲染 |
 | 托管生成 | docs/.vitepress/sidebar.generated.mjs | 从两种语言的 _sidebar.md 生成 |
 | 托管复制 | docs/public/.nojekyll、下载页生成器/workflow | update 同步 |
@@ -19,7 +19,7 @@ Python 脚本更新配置和检查文件，VitePress 构建网站。构建前需
 
 README.md 与 en/README.md 发布为 `/` 与 `/en/`；`_sidebar.md` 只用于生成导航，不作为页面发布。尚未迁移的 v1 仓库继续使用旧 Docsify 模板。
 
-`.docsite.json` 支持 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation。未知字段和错误类型会报错，旧配置缺少的字段会使用默认值。navigation 的两个开关见[导航规则](/NAVIGATION.md)。
+`.docsite.json` 顶层接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode；未知字段和错误类型会报错。packageMode 可设 managed（默认，整体托管依赖文件）或 merge（保留已有 Node 项目，只合并 docs scripts 与 VitePress 依赖）。旧配置缺少的字段会使用默认值，navigation 的两个开关见[导航规则](/NAVIGATION.md)。
 
 ## 语言与文件命名
 
@@ -76,6 +76,7 @@ README.md 与 en/README.md 发布为 `/` 与 `/en/`；`_sidebar.md` 只用于生
 
 - `displayName`：页面标题里的产品名，默认取仓库名（仅当仓库名与产品显示名不一致时才需要）
 - `previewFile`：手写预览片段，存在时注入第一语言页（默认中文，放应用截图等）
+- `previewFiles`：按语言指定预览片段，如 `{"en":"docs/en/download-preview.md"}`；对应语言优先使用这份文件
 - `linkBase`：v2 使用 `""`，由 VitePress base 处理仓库子路径；`"/docs"` 仅适用于旧 v1 拼接发布，迁移时会清空
 - `languages` / `outputs`：默认 `["zh","en"]` 与固定路径；自定义路径必须同时满足页面互链与导航，缺翻译页时构建会因 dead link 失败
 - `trackPrerelease`：默认 `false`，pre-release 不覆盖 stable 页面

@@ -16,9 +16,9 @@ python3 /tmp/docsite/docsite.py preview
 
 v2 的 `update` 会重写 package.json/lock、config.mts、docs.yml、public/.nojekyll 和下载页脚本，补齐 .gitignore，并从 `_sidebar.md` 生成导航。正文和 `_sidebar.md` 不会被覆盖。站点配置改 `.docsite.json`，导航改 `_sidebar.md`。
 
-已有 Node 项目需要注意：docsite 会替换根 package.json 和 lock。替换非托管文件前会留下 `*.docsite.bak`，重复备份加序号。
+已有 Node 项目请在 `.docsite.json` 设置 `"packageMode": "merge"`，新接入也可用 `init --package-mode merge`。update 只合并 docs:* scripts 和固定版本的 VitePress 开发依赖，保留业务字段与原 lock；随后运行 `npm install` 更新锁文件。若已有同名 docs:* 命令且内容不同，会报错，需先人工合并。
 
-需要保留的业务 scripts、依赖和锁文件要手动合并，再安装和构建。合并后的自定义字段会让 `check` 报 DRIFT，下次 update 也会再次替换这些文件。当前版本尚不能直接保留已有 Node 工程的包配置，接入前请先检查这一点。
+默认的 managed 模式仍按模板整体更新 package.json/lock，适用于没有业务 Node 包的文档工程。替换非托管文件前会留下 `*.docsite.bak`，重复备份加序号。
 
 依赖升级：先修改模板 package.json 的固定版本并在 template/ 运行 `npm install` 更新模板 lock；目标仓库再运行 `update` 和 `npm ci`（人工合并依赖后使用 `npm install` 重算 lock）。v2 update 自动同步 `.docsite.json` 的 engineVersion/version。
 

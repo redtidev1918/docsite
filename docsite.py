@@ -83,6 +83,8 @@ def render(text, cfg):
         "THEME_KEY": cfg.get("themeKey", ""),
         "REPO": cfg["repo"],
         "BRANCH": cfg.get("branch", "main"),
+        "CONTENT_PATHS": "".join("\n      - " + json.dumps(path, ensure_ascii=False)
+                                 for path in cfg.get("contentPaths", [])),
     }
     def sub(m):
         return tokens[m.group(1)]
@@ -222,8 +224,11 @@ def _write_v2_managed(cfg, root=".", verbose=True):
     """写入 v2 托管文件(init/update/migrate 共用);用户 Markdown 永不触碰。"""
     root = Path(root)
     wrote = []
+    merge_package = cfg.get("packageMode", "managed") == "merge"
     # init/update/migrate 都保护首次接管的文件;已有备份不可被静默覆盖。
     for rel in list(V2_MANAGED.values()) + [VP_CONFIG_REL, VP_SIDEBAR_REL] + [Path(p) for p in SYNCED.values()]:
+        if merge_package and rel.name in ("package.json", "package-lock.json"):
+            continue
         target = root / rel
         template_rel = next((tpl for tpl, dst in V2_MANAGED.items() if dst == rel), None)
         same_template = template_rel and target.is_file() and target.read_bytes() == (TEMPLATE / template_rel).read_bytes()
@@ -232,6 +237,25 @@ def _write_v2_managed(cfg, root=".", verbose=True):
     # package.json/lock 逐字节下发(无 token),保证全仓库依赖版本一致
     for tpl in ("package.json", "package-lock.json"):
         rel = V2_MANAGED[tpl]
+        if merge_package:
+            if tpl == "package.json":
+                template_pkg = json.loads((TEMPLATE / tpl).read_text(encoding="utf-8"))
+                target = root / rel
+                pkg = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+                for name, command in template_pkg["scripts"].items():
+                    current = pkg.setdefault("scripts", {}).get(name)
+                    if current is not None and current != command:
+                        raise ValueError(f"{name} 已有不同命令;请先人工合并 docs:* scripts")
+                    pkg["scripts"][name] = command
+                pkg.setdefault("devDependencies", {})["vitepress"] = template_pkg["devDependencies"]["vitepress"]
+                text = json.dumps(pkg, ensure_ascii=False, indent=2) + "\n"
+                if not target.exists() or target.read_text(encoding="utf-8") != text:
+                    if target.exists():
+                        _backup_file(target)
+                    write_file(target, text, overwrite=True)
+                wrote.append(rel)
+            # npm 管理合并后的 lock,不使用纯文档工程的模板 lock 覆盖业务依赖。
+            continue
         write_file(root / rel, (TEMPLATE / tpl).read_text(encoding="utf-8"), overwrite=True)
         wrote.append(rel)
 
@@ -265,7 +289,10 @@ def _write_v2_managed(cfg, root=".", verbose=True):
             print(f"  ~ {rel}")
         for entry in added_gi:
             print(f"  + .gitignore: {entry}")
-        print("  依赖清单已按模板锁定;提交前运行 `npm install`(或 npm ci)同步本地 node_modules")
+        if merge_package:
+            print("  已保留业务 package.json/lock 并合并 docs scripts;运行 npm install 更新依赖锁")
+        else:
+            print("  依赖清单已按模板锁定;提交前运行 `npm install`(或 npm ci)同步本地 node_modules")
     return wrote
 
 
@@ -293,13 +320,13 @@ def origin_slug():
 def validate_config(cfg):
     """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
     allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
-               "version", "engine", "engineVersion", "navigation"}
+               "version", "engine", "engineVersion", "navigation", "packageMode", "contentPaths"}
     if not isinstance(cfg, dict):
         raise ValueError(".docsite.json 必须是对象")
     unknown = set(cfg) - allowed
     if unknown:
         raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
-    for key in allowed - {"version", "navigation"}:
+    for key in allowed - {"version", "navigation", "contentPaths"}:
         if key in cfg and not isinstance(cfg[key], str):
             raise ValueError(f".docsite.json {key} 必须是字符串")
     if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
@@ -310,6 +337,11 @@ def validate_config(cfg):
         raise ValueError("version 必须是 1 或 2")
     if "engine" in cfg and cfg["engine"] not in ("docsify", "vitepress"):
         raise ValueError("engine 必须是 docsify 或 vitepress")
+    if cfg.get("packageMode", "managed") not in ("managed", "merge"):
+        raise ValueError("packageMode 必须是 managed 或 merge")
+    paths = cfg.get("contentPaths", [])
+    if not isinstance(paths, list) or any(not isinstance(p, str) or not p or "\n" in p or "\r" in p for p in paths):
+        raise ValueError("contentPaths 必须是非空单行路径字符串组成的数组")
     nav = cfg.get("navigation", {})
     if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
                                          or not isinstance(v, bool) for k, v in nav.items()):
@@ -433,6 +465,8 @@ def cmd_init(args):
     })
     if args.theme_key:
         cfg["themeKey"] = args.theme_key  # v1 兼容参数,仅为显式传入时保留
+    if args.package_mode == "merge":
+        cfg["packageMode"] = "merge"
 
     write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
 
@@ -496,6 +530,19 @@ def _check_v2_files(root):
         rel = str(V2_MANAGED[tpl])
         want = (TEMPLATE / tpl).read_text(encoding="utf-8")
         target = root / V2_MANAGED[tpl]
+        if cfg.get("packageMode") == "merge" and target.is_file():
+            data = json.loads(target.read_text(encoding="utf-8"))
+            template_pkg = json.loads((TEMPLATE / "package.json").read_text(encoding="utf-8"))
+            if tpl == "package.json":
+                correct = (all(data.get("scripts", {}).get(k) == v for k, v in template_pkg["scripts"].items())
+                           and data.get("devDependencies", {}).get("vitepress") == engine_version())
+            else:
+                packages = data.get("packages", {})
+                correct = (packages.get("", {}).get("devDependencies", {}).get("vitepress") == engine_version()
+                           and packages.get("node_modules/vitepress", {}).get("version") == engine_version())
+            rows.append((root.name, rel, "ok" if correct else "DRIFT",
+                         "" if correct else "docs scripts / VitePress 版本或 lock 不一致;运行 npm install"))
+            continue
         if not target.is_file():
             rows.append((root.name, rel, "MISSING", "-"))
         elif target.read_text(encoding="utf-8", errors="ignore") != want:
@@ -1153,7 +1200,8 @@ def cmd_navcheck(args):
         checked += 1
         cfg, schema_problems = _nav_config(root)
         # 英文内容的前缀跟着发布布局走：壳形态在 /docs/en/，新形态在 /en/。
-        en_prefix = "/docs/en/" if (root / ".github" / "pages" / "index.html").is_file() else "/en/"
+        en_prefix = ("/docs/en/" if not is_vitepress(root)
+                     and (root / ".github/pages/index.html").is_file() else "/en/")
         issues = []
         for problem in schema_problems:
             issues.append((root.name, "NAVIGATION_SCHEMA", problem, "error"))
@@ -1230,6 +1278,8 @@ def main():
     i.add_argument("--description", help="meta description，默认「<name> 文档中心……」")
     i.add_argument("--branch", default="main", help="触发部署的分支，默认 main")
     i.add_argument("--theme-key", help="localStorage 主题 key，默认 <name>-theme")
+    i.add_argument("--package-mode", choices=("managed", "merge"), default="managed",
+                   help="依赖清单模式;已有 Node 工程使用 merge 保留业务字段与 lock")
     i.set_defaults(func=cmd_init)
 
     u = sub.add_parser("update", help="按最新模板刷新托管文件")

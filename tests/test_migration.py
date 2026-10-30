@@ -228,6 +228,34 @@ class UpdateV2TestCase(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_merge_package_mode_preserves_application_scripts_and_lock(self):
+        import docsite as ds
+        original = {"name": "application", "private": False,
+                    "scripts": {"build": "tsc", "test": "jest"},
+                    "workspaces": ["packages/*"], "dependencies": {"application-sdk": "1.0.0"}}
+        package = self.root / "package.json"
+        package.write_text(json.dumps(original), encoding="utf-8")
+        lock = self.root / "package-lock.json"
+        lock.write_text('{"name":"application","keep":"original lock"}', encoding="utf-8")
+        before_lock = lock.read_bytes()
+        ds._write_v2_managed(dict(CFG, packageMode="merge"), root=self.root, verbose=False)
+        merged = json.loads(package.read_text(encoding="utf-8"))
+        self.assertEqual(merged["scripts"]["build"], "tsc")
+        self.assertEqual(merged["scripts"]["test"], "jest")
+        for key in ("name", "private", "workspaces", "dependencies"):
+            self.assertEqual(merged[key], original[key])
+        self.assertEqual(merged["devDependencies"]["vitepress"], ds.engine_version())
+        self.assertEqual(lock.read_bytes(), before_lock)
+
+    def test_merge_package_mode_refuses_custom_docs_script_without_overwrite(self):
+        import docsite as ds
+        package = self.root / "package.json"
+        package.write_text('{"scripts":{"docs:build":"my-docs-command"}}', encoding="utf-8")
+        before = package.read_bytes()
+        with self.assertRaises(ValueError):
+            ds._write_v2_managed(dict(CFG, packageMode="merge"), root=self.root, verbose=False)
+        self.assertEqual(package.read_bytes(), before)
+
     def test_update_refreshes_managed_keeps_content(self):
         run = subprocess.run([sys.executable, str(DOCSITE), "update"],
                              cwd=self.root, capture_output=True, text=True)

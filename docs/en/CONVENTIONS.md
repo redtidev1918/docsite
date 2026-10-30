@@ -17,7 +17,7 @@ The Python script updates configuration and checks files. VitePress builds the s
 
 README.md and en/README.md appear at `/` and `/en/`. Sidebar Markdown supplies navigation and is not published as a page. Unmigrated v1 repositories keep using the Docsify templates.
 
-The .docsite.json top-level whitelist is repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation. Unknown fields and invalid types are rejected; legacy fields retain defaults. See [Navigation](/en/NAVIGATION.md) for the two boolean exceptions.
+The .docsite.json fields are repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode. PackageMode is managed by default, or merge to preserve an existing Node project and add only documentation scripts and VitePress. Unknown fields and invalid types are rejected; legacy fields retain defaults. See [Navigation](/en/NAVIGATION.md) for the two boolean exceptions.
 
 ## Languages and names
 
@@ -44,6 +44,8 @@ Update synchronizes `.github/scripts/update_download_page.py` and `.github/workf
 `trackPrerelease` defaults to false; `docsWorkflow` defaults to docs.yml. Use `--tag v1.2.3` for a specific release, `--input-json release.json` for local testing and `--check` to check for updates. Page markers record the repository, tag and publication date. A late task for an older tag will not overwrite a newer page unless you use `--force`.
 
 List binary assets by platform with latest-download links and checksums. For package-only projects, give installation commands and registry links. Releases created with GITHUB_TOKEN need workflow_call or workflow_dispatch to start the download-page workflow; other releases can use release:published. After committing changed pages, the workflow triggers docs.yml because a GITHUB_TOKEN push does not trigger push-based deployment.
+
+`previewFiles` selects a preview for each language, for example `{"en":"docs/en/download-preview.md"}`. It takes precedence over previewFile for that language.
 
 ## Deployment
 

@@ -137,6 +137,30 @@ class GeneratorTestCase(unittest.TestCase):
         self.assertIn("== CUSTOM PREVIEW ==", self.page("docs/download.md"))
         self.assertNotIn("== CUSTOM PREVIEW ==", self.page("docs/en/download.md"))
 
+    def test_language_specific_preview_preserves_installation_and_images(self):
+        # DAViewer's existing config uses previewFiles.en alongside the default zh preview.
+        self.write_payload(make_payload(assets=TELPOST_ASSETS))
+        (self.root / "docs/en").mkdir(parents=True)
+        (self.root / "docs/download-preview.md").write_text("中文安装说明", encoding="utf-8")
+        preview = "### Installation\n\n![App preview](../screenshots/app.jpg)"
+        (self.root / "docs/en/download-preview.md").write_text(preview, encoding="utf-8")
+        run = self.run_gen(config=self.write_config({"previewFiles": {"en": "docs/en/download-preview.md"}}))
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn(preview, self.page("docs/en/download.md"))
+        self.assertIn("中文安装说明", self.page("docs/download.md"))
+        self.assertNotIn("中文安装说明", self.page("docs/en/download.md"))
+
+    def test_english_generic_assets_have_english_platform_label(self):
+        self.write_payload(make_payload(assets=[asset("SHA256SUMS")]))
+        self.run_gen(config=self.write_config({}))
+        self.assertIn("| All platforms |", self.page("docs/en/download.md"))
+        self.assertIn("| 通用 |", self.page("docs/download.md"))
+
+    def test_generated_pages_use_lf_on_every_platform(self):
+        self.write_payload(make_payload())
+        self.run_gen(config=self.write_config({}))
+        self.assertNotIn(b"\r\n", (self.root / "docs/download.md").read_bytes())
+
     def test_check_ok(self):
         self.write_payload(make_payload(tag="v1.2.0", assets=[asset("a")]))
         self.run_gen(config=self.write_config({}))
