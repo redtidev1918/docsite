@@ -44,7 +44,7 @@
 - ⬜ 5-2 docsite 自身切换配置就绪;真实 Pages 发布待所有者合并 PR
 - ⬜ 5-3 docsite 上线后从用户指定六站中选择一个业务仓库试点
 - ⬜ 5-4 试点验收后逐个独立 PR:DAViewer、DeviantDrop、deviantart-downloader、PixivFlow、TelePost、NekoTime
-- 🔄 5-5 整理提交、创建 PR(不自动合并);新增 PR 上的 Python/Node22/build/check/navcheck CI
+- ✅ 5-5 已推送并创建 [PR #11](https://github.com/redtidev1918/docsite/pull/11),未自动合并;新增 Python/Node22/build/check/navcheck CI
 
 ## 已归档(不再执行)
 

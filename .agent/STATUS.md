@@ -15,7 +15,7 @@
 
 ## 当前阶段
 
-**阶段 1–4 ✅ 完成;阶段 5 中英文档与 PR 校验 workflow 完成。**
+**阶段 1–4 ✅ 完成;阶段 5 文档与 [PR #11](https://github.com/redtidev1918/docsite/pull/11) 已交付,待审查合并上线。**
 
 - 阶段 3:init v2/update 引擎感知/check v2/migrate/build-preview-dev 完成,模板内容移入 template/docs/。
 - 测试:60 例通过(1 skip),自身与旧壳迁移 fixture 构建成功,最终无 .git 副本 check 9/9、navcheck 全绿。

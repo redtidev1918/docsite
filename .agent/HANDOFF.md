@@ -19,6 +19,7 @@
 
 ## 2026-10-30 · 阶段 5 本仓库交付准备与六站重建范围
 
+- **交付:** 分支已推送,[PR #11](https://github.com/redtidev1918/docsite/pull/11) 已创建,未合并。GitHub connector 创建 PR 返回 integration 403,使用本机已授权 gh 完成创建。
 - **已完成:** 根目录中英文 README、站内首页/快速开始/规范/导航/升级和下载页同步到 VitePress 定位;补齐英文规范镜像与导航。更新自身描述与 version:2,由 update 生成配置/sidebar。新增 PR CI:Python、Node 22 npm ci/build、无 .git 副本 check/navcheck。
 - **最终本地验证:** 60 测试通过(1 skip);npm ci 成功;Node 22.23.4 build 零 dead link;check 9/9、navcheck 通过。文档更新后再次运行浏览器矩阵,72 次渲染无整体横向滚动/资源错误,36 张截图已刷新并抽查新版中英与移动端。
 - **用户新增范围:** docsite 上线后重建 DAViewer、DeviantDrop、deviantart-downloader、PixivFlow、TelePost、NekoTime 六个站点。按新引擎重建理解;先一个试点,再逐个独立 PR 与构建/线上/下载页验收,不自动合并。
