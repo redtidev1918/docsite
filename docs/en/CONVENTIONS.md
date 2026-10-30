@@ -2,9 +2,9 @@
 
 **Language / 语言:** [中文](/CONVENTIONS.md) · English
 
-## Ownership and build
+## Who maintains each file
 
-VitePress requires Node.js 22+ and npm ci. Python's standard library manages project files, checks and migration.
+The Python script updates configuration and checks files. VitePress builds the site with Node.js 22+ after `npm ci`.
 
 | Owner | Files | Update behavior |
 | --- | --- | --- |
@@ -13,9 +13,9 @@ VitePress requires Node.js 22+ and npm ci. Python's standard library manages pro
 | Managed generation | docs/.vitepress/sidebar.generated.mjs | Generated from both locale sidebars |
 | Managed copies | docs/public/.nojekyll, download generator/workflow | Synchronized by update |
 | User content | docs/*.md, docs/en/*.md, including _sidebar.md | Never overwritten by update; init only creates missing starter pages |
-| Repository configuration | .docsite.json, .github/scripts/download-page.json | Maintained by the repository; migrate explicitly upgrades and backs up fields |
+| Repository configuration | .docsite.json, .github/scripts/download-page.json | You; migrate backs up these files before updating fields |
 
-README.md and en/README.md are rewritten to `/` and `/en/`. Sidebar Markdown is excluded from page output. V2 needs no custom index.html, vendored frontend or custom theme. Legacy templates remain only for unmigrated v1 projects.
+README.md and en/README.md appear at `/` and `/en/`. Sidebar Markdown supplies navigation and is not published as a page. Unmigrated v1 repositories keep using the Docsify templates.
 
 The .docsite.json top-level whitelist is repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation. Unknown fields and invalid types are rejected; legacy fields retain defaults. See [Navigation](/en/NAVIGATION.md) for the two boolean exceptions.
 
@@ -23,11 +23,13 @@ The .docsite.json top-level whitelist is repo/name/emoji/description/branch/them
 
 Chinese is the default: root README.md, docs/README.md and docs/PAGE.md. The root English mirror is README.en.md; site mirrors use docs/en/README.md and docs/en/PAGE.md. Keep matching page names and a language link at the top. Do not create README_EN.md, README_CN.md or separate docs/zh-CN trees.
 
-Machine-generated, legal and industry-standard files retain canonical names and original languages: CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md and SECURITY.md. Translation copies may use .zh-CN.md / .en.md. Never rename files required by release-please, package managers or compliance tools for cosmetic consistency. Registry READMEs remain Chinese with an English link; do not invent separate npm/PyPI language rules.
+Keep the original names and languages of files such as CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md and SECURITY.md. Translation copies may use .zh-CN.md / .en.md. For example, Graf uses release-please to maintain the English CHANGELOG.md and keeps its Chinese translation in CHANGELOG.zh-CN.md. Keep fixed paths required by package managers and compliance tools too.
+
+The npm and PyPI READMEs use the Chinese README with an English link at the top. Keep pyproject.toml's readme pointing to README.md; handle a separate English package description in the release process if needed.
 
 ## Download pages
 
-The managed `.github/scripts/update_download_page.py` and `.github/workflows/update-download-page.yml` generate both language pages from release metadata. Do not maintain per-repository generator forks. Repository settings belong in `.github/scripts/download-page.json`:
+Update synchronizes `.github/scripts/update_download_page.py` and `.github/workflows/update-download-page.yml`. These generate both language pages from release data. Put project-specific settings in `.github/scripts/download-page.json` so update does not overwrite them:
 
 ```json
 {
@@ -37,11 +39,11 @@ The managed `.github/scripts/update_download_page.py` and `.github/workflows/upd
 }
 ```
 
-DisplayName changes the product title; previewFile adds a handwritten preview. V2 uses empty linkBase: VitePress handles the repository base. `/docs` applies only to legacy assembled v1 sites and is cleared during migration. Languages/outputs default to zh and en; custom output paths must satisfy language links and navigation. Missing referenced locale pages fail the build.
+`displayName` changes the product title; `previewFile` adds a handwritten preview. V2 uses an empty `linkBase` because VitePress handles the repository base. `/docs` applies to legacy assembled v1 sites and is cleared during migration. `languages` / `outputs` default to zh and en. Custom output paths need working language links and navigation; a missing linked page fails the build.
 
-TrackPrerelease defaults to false. DocsWorkflow defaults to docs.yml. Pass `--tag v1.2.3` for an exact release, `--input-json release.json` for local testing, and `--check` to validate freshness. Page markers record repository, tag and publication date. Stale-write protection blocks late older tags; `--force` explicitly overrides it.
+`trackPrerelease` defaults to false; `docsWorkflow` defaults to docs.yml. Use `--tag v1.2.3` for a specific release, `--input-json release.json` for local testing and `--check` to check for updates. Page markers record the repository, tag and publication date. A late task for an older tag will not overwrite a newer page unless you use `--force`.
 
-Binary assets are grouped by platform with stable latest-download links and checksums. Package-only projects document registry installation instead of inventing binaries. GITHUB_TOKEN-created releases must use workflow_call or workflow_dispatch; release:published is the fallback. After changed pages are committed, the workflow explicitly dispatches docs.yml because its GITHUB_TOKEN push does not trigger push-based deployment.
+List binary assets by platform with latest-download links and checksums. For package-only projects, give installation commands and registry links. Releases created with GITHUB_TOKEN need workflow_call or workflow_dispatch to start the download-page workflow; other releases can use release:published. After committing changed pages, the workflow triggers docs.yml because a GITHUB_TOKEN push does not trigger push-based deployment.
 
 ## Deployment
 

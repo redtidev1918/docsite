@@ -7,7 +7,7 @@
 <!-- docsite: hand-written until the first release; the managed generator
      (update_download_page.py) rewrites this page once a release exists. -->
 
-> Distributed as source and templates. The Python management layer uses the standard library; building the site requires Node.js 22+, npm ci and VitePress.
+Clone the Git repository to get docsite's script and templates. The script runs with Python 3; building the site also requires Node.js 22+ and npm.
 
 ## How to get it
 
@@ -15,27 +15,16 @@
 git clone https://github.com/redtidev1918/docsite.git /tmp/docsite
 ```
 
-If `python3` exists on the machine, you can run it immediately:
+View command help:
 
 ```bash
 python3 /tmp/docsite/docsite.py --help
 ```
 
-## Why there are no Releases
-
-docsite's value is the template, and the template travels with the repository, so
-docsite ships no binaries and publishes to no package index. Every managed repo runs
-`python3 /tmp/docsite/docsite.py update` from that same clone; an extra download step
-would only add another copy that can go stale.
-
-To pin a version, check out the commit or tag:
+The script and templates live in the same repository. To pin a version, check out the commit or tag:
 
 ```bash
 git -C /tmp/docsite checkout <commit>
 ```
 
-## Next
-
-After initializing the target repository, run `npm ci`, then `npm run docs:build` and `npm run docs:preview`.
-
-- [Quick Start](/en/QUICKSTART.md): attach a docs site to a repository
+Follow [Quick Start](/en/QUICKSTART.md) to initialize the target repository, then run `npm ci`, `npm run docs:build` and `npm run docs:preview`.

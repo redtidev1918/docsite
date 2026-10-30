@@ -2,11 +2,11 @@
 
 **语言 / Language:** 中文 · [English](README.en.md)
 
-轻量级开源项目文档网站生成器：VitePress 负责渲染、默认主题、搜索与多语言，Python CLI 负责初始化、升级、检查、迁移与下载页，GitHub Pages 负责托管。
+给 GitHub 仓库生成文档站。用 VitePress 渲染 Markdown，部署到 GitHub Pages；用 Python 脚本初始化、更新配置和生成下载页。
 
-前提：Python 3、Node.js 22+ 和 npm。Python 管理层仅用标准库；网站通过 `npm ci` 安装锁定依赖并构建。
+需要 Python 3、Node.js 22+ 和 npm。Python 脚本只用标准库，网站依赖用 `npm ci` 安装。
 
-站点：[docsite](https://redtidev1918.github.io/docsite/)。下游旧站仍可使用 Docsify；迁移须逐仓库执行并审查独立 PR。
+[查看文档站](https://redtidev1918.github.io/docsite/)。旧 Docsify 站点的迁移步骤见[升级指南](docs/UPGRADE.md)。
 
 ## 从哪开始
 
@@ -17,7 +17,7 @@
 | 只改文档内容 | 直接编辑 `docs/*.md`，推送到 `main` |
 | 更新模板或托管 workflow | [升级模板](docs/UPGRADE.md) |
 
-Markdown 留在业务仓库里，`update` 永不覆盖正文或 `_sidebar.md`。侧边栏由 `_sidebar.md` 生成，不手工维护第二份配置。
+正文和 `_sidebar.md` 由各仓库自己维护，`update` 不会覆盖它们。修改侧边栏后运行 `update`，生成 VitePress 所需的导航配置。
 
 ## 快速开始
 
@@ -64,7 +64,7 @@ docs/
 .github/scripts/update_download_page.py
 ```
 
-Markdown 由仓库自己维护；依赖清单、VitePress 配置、生成的 sidebar 和部署链路由模板托管。已有 Node 工程的 scripts/依赖需要在 PR 中人工合并，详见[升级指南](docs/UPGRADE.md)。
+`update` 会重写依赖清单、VitePress 配置、生成的 sidebar 和 workflow。已有 Node 项目需要先处理根 package.json 的 scripts 和依赖，详见[升级指南](docs/UPGRADE.md)。
 
 ## 日常使用
 
@@ -72,7 +72,7 @@ Markdown 由仓库自己维护；依赖清单、VitePress 配置、生成的 sid
 2. 在 `docs/_sidebar.md` 中用根绝对路径加入口，例如 `- [架构](/ARCHITECTURE.md)`。
 3. 修改侧边栏后运行 `python3 /tmp/docsite/docsite.py update`，再构建预览并推送。
 
-下载页由 `.github/workflows/update-download-page.yml` 根据 Release 数据刷新，并显式 dispatch `docs.yml` 重建。旧 Docsify 站点先运行 `migrate --dry-run`，再按[升级指南](docs/UPGRADE.md)迁移。
+发版后，`update-download-page.yml` 根据 Release 数据更新下载页，再触发 `docs.yml` 重新构建站点。
 
 ## 质量检查
 
@@ -84,10 +84,10 @@ python3 docsite.py update
 
 `check` 校验托管文件、依赖锁、配置和下载页链路；`navcheck` 校验导航与生成 sidebar 一致性。下载页内容版本通过生成器的 `--check` 单独核对。
 
-## 非目标
+## 功能范围
 
-不维护自定义主题、服务端搜索或外部搜索服务；使用 VitePress 默认主题和本地搜索。每个仓库独立升级、独立 PR，不自动合并。
+网站使用 VitePress 默认主题和本地搜索。docsite 不提供主题系统或服务端搜索。升级需要在各仓库运行命令、检查 diff 后提交。
 
 ## 许可
 
-MIT。完整规范、部署边界和升级方式见 [文档站](https://redtidev1918.github.io/docsite/)。
+MIT。
