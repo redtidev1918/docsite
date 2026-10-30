@@ -22,12 +22,12 @@
 
 ## 阶段 3 — 迁移与升级管理
 
-- ⬜ 3-1 `migrate` 命令:`--dry-run`、备份受管 Docsify 文件、生成 VitePress 配置、转换导航
-- ⬜ 3-2 旧结构识别:`.github/pages/` 外壳、旧 `static.yml`(先识别是否承担其他部署,不盲目删)、带托管标记的 `index.html` 才允许清理
-- ⬜ 3-3 旧链接扫描:正文/导航中的 `#/` Hash 路由迁移为 VitePress 路径
-- ⬜ 3-4 `update` 语义扩展:托管文件清单加入 VitePress 配置/依赖/workflow;仍永不覆盖用户 Markdown
-- ⬜ 3-5 `check` 扩展:依赖锁文件一致性、sidebar 生成结果与 `_sidebar.md` 一致、下载页链路
-- ⬜ 3-6 `build`/`preview`/`dev` 包装命令(调用 VitePress CLI,Python 不做渲染)
+- ✅ 3-1 `migrate` 命令:`--dry-run`、备份受管 Docsify 文件、生成 VitePress 配置、转换导航
+- ✅ 3-2 旧结构识别:`.github/pages/` 外壳、旧 `static.yml`(先识别是否承担其他部署,不盲目删)、带托管标记的 `index.html` 才允许清理
+- ✅ 3-3 旧链接扫描:正文/导航中的 `#/` Hash 路由迁移为 VitePress 路径
+- ✅ 3-4 `update` 语义扩展:托管文件清单加入 VitePress 配置/依赖/workflow;仍永不覆盖用户 Markdown
+- ✅ 3-5 `check` 扩展:依赖锁文件一致性、sidebar 生成结果与 `_sidebar.md` 一致、下载页链路
+- ✅ 3-6 `build`/`preview`/`dev` 包装命令(调用 VitePress CLI,Python 不做渲染)
 
 ## 阶段 4 — 完整质量门禁
 

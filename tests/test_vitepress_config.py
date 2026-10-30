@@ -141,7 +141,7 @@ class NavcheckV2TestCase(unittest.TestCase):
         docsite.write_sidebars(self.root)
         run = self.run_navcheck()
         self.assertEqual(run.returncode, 0, run.stdout)
-        self.assertIn("✅", run.stdout)
+        self.assertIn(self.root.name, run.stdout)
 
     def test_missing_generated_sidebar_is_stale(self):
         run = self.run_navcheck()

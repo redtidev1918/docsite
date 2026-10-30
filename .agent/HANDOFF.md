@@ -17,6 +17,21 @@
 
 ---
 
+## 2026-10-30 · 阶段 3 验收完成
+
+- **已完成:** 修复交接的四个失败;补齐 v2 下载页同步链路、非托管文件接管前备份、备份重名保护、正文/配置改写前备份、cp -R 来源识别和 Windows 控制台符号容错。
+- **已验证:** 58 个 Python 测试通过(1 skip);自身 update 前后 11 个 Markdown SHA-256 不变,config 与模板渲染一致;自身 build 成功。临时旧壳 fixture 的 dry-run 报告 themes 拷贝与根 Markdown 不再发布;实际迁移备份齐全、static.yml 停用、构建成功。无 .git 自身副本 check/navcheck 全绿。
+- **下一步:** 阶段 4 截图/子路径/下载页本地端到端;阶段 5 文档和 PR。正式 Pages 上线须所有者合并 PR 后验证,禁止自动合并。
+
+## 2026-10-30 · 阶段 3 代码完成未提交,会话交接
+
+- **进行中:** 阶段 3 收尾。接任提示词:[PROMPT_RESUME_PHASE3.md](PROMPT_RESUME_PHASE3.md)(含 4 个已知测试失败的确切修法)。
+- **已完成(工作区未提交):** docsite.py 全套阶段 3 命令(`_write_v2_managed`/`cmd_init` v2 重写/`cmd_update` 引擎感知/`cmd_check` + `_check_v2_files`/`cmd_migrate` 含 --dry-run、备份、static.yml 停用改名、`#/` hash 与壳形态 `/docs/` 前缀改写、linkBase 清空/`cmd_run_docs` build-preview-dev 包装);模板结构重组到 `template/docs/`(内容文件 git mv 已 staged);`template/package.json` 加 `"docsite-managed-file": true` JSON 标记(`is_managed` 新增第三种匹配模式,解决「目标仓库自带 package.json 会被静默替换」隐患——替换前走备份+警示);`render()` 容忍缺失 themeKey;`_strip_docs_prefix` 保留首斜杠(修掉吃掉 `/` 的 bug);tests/test_migration.py(28 例)+ test_build.py(4 例)。
+- **已验证:** 阶段 1/2 的 36 例测试在阶段 3 改动后仍全绿;阶段 3 新测试 56 例中 4 个失败原因全部定位(3 个测试侧 fixture/断言 + 1 个产品侧 Windows 路径分隔符,见接任提示词 §1)。
+- **未验证:** 修完测试后的全套绿灯;docsite 自身跑 v2 `update` 的托管刷新;check v2 对 fixture 全绿;migrate --dry-run 对带 `cp -R` 的 static.yml 的报告输出。
+- **风险/注意:** ① 根 package.json 会被 v2 托管——Node 项目仓库迁移时 PR 必须人工合并其 scripts/依赖(写进 UPGRADE);② IAB 截图在面板后台时 surface 超时,阶段 4 截图矩阵用前台面板或 Playwright CLI;③ 4173 端口 preview 后台任务可能残留。
+- **下一步:** PROMPT_RESUME_PHASE3.md §1(修测试)→ §2(阶段 3 验收+提交)→ §3/§4(阶段 4/5)。
+
 ## 2026-10-30 · 阶段 2:兼容现有文档规范完成
 
 - **进行中:** TASKS.md → 阶段 3(迁移与升级管理)。
