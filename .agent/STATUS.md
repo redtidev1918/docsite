@@ -8,22 +8,23 @@
 
 | 项 | 状态 |
 | --- | --- |
-| 分支 | `main`,工作区干净 |
-| 测试 | 上次全量通过(以 `tests/` 回归为准) |
-| CI / Pages | 正常,Actions 发布 GitHub Pages |
+| 分支 | `main` 干净(@7bcfcb5);归档分支 `archive/docsify-custom-theme`(@db1916f) |
+| 测试 | 19 个基线测试通过(Docsify 现状);28-test 自研主题版本仅存在于归档分支 |
+| CI / Pages | 正常(仍是 Docsify 无构建部署) |
 | 下游站点 | PixivFlow · DAKit · DAViewer · TelePost · ReleaseGraph · docsite 自身 |
 
 ## 当前阶段
 
-**视觉升级 P0 实施中:P0-1 现状审计已完成,产出 [AUDIT.md](AUDIT.md)。**
+**计划 v2:引擎迁移 Docsify → VitePress(D-009,所有者定案)。尚未开始实施。**
 
-- 19 个现有测试全过(基线 @ `main` 9dd3caa)
-- 关键结论:新增 `assets/styles|scripts` 是纯叠加改动;雷区在 navcheck 规则(alias/subMaxLevel/锚点)与下载页测试断言
-- 遗留决策已定(所有者授权代理决定):D-006 叠加覆盖、D-007 JS 注入 Hero,见 [DECISIONS.md](DECISIONS.md)
+- 原「视觉设计升级」计划已废止;两轮自研主题成果归档于 `archive/docsify-custom-theme`
+- 实施提示词已产出:[PROMPT_VITEPRESS_MIGRATION.md](PROMPT_VITEPRESS_MIGRATION.md)(建议在**全新会话**中执行,本会话上下文已很长)
+- VitePress 迁移现状审计补充:[AUDIT.md](AUDIT.md) 的生成器/配置/下载页/测试结论仍有效;§4 navcheck 红线与 §5 主题机制章节随引擎更换而退役
 
 ## 下一步
 
-1. 执行 [TASKS.md](TASKS.md) P0-2:`template/assets/styles/tokens.css`(色彩/字体/间距/圆角/阴影/断点变量)+ `themes.css`(亮暗语义色)
+1. 新会话载入实施提示词,执行 [TASKS.md](TASKS.md) 阶段 1(VitePress 基础集成)
+2. 每阶段验收(见 PLAN v2)后才进入下一阶段
 
 ## 进行中 / 阻塞
 

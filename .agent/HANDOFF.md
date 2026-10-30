@@ -17,6 +17,15 @@
 
 ---
 
+## 2026-10-30 · 架构转向:VitePress 迁移(D-009),自研主题归档
+
+- **进行中:** 无代码任务;VitePress 迁移待新会话按 [PROMPT_VITEPRESS_MIGRATION.md](PROMPT_VITEPRESS_MIGRATION.md) 启动。
+- **已完成:** 两轮自研主题(叠加覆盖→完整自研)全部实现并经浏览器验证机制生效,但所有者两次否决视觉效果后定案引擎迁移(D-009);自研成果完整提交到 `archive/docsify-custom-theme`(db1916f,含 28 个通过测试);main 恢复干净;PLAN/TASKS/DECISIONS 全部重写为 v2。
+- **已验证:** 归档分支可 checkout;main 工作区干净;Docsify 基线 19 测试通过。
+- **未验证:** VitePress 方案本身(阶段 1 起步)。
+- **风险/注意:** 本地 `http.server` 8123 端口可能仍有残留进程;旧壳仓库迁移不要盲目删 `static.yml`;`/#/` Hash 链接迁移是阻断级检查项。
+- **下一步:** TASKS.md → 阶段 1-1(建议全新会话执行提示词)。
+
 ## 2026-10-30 · P0-1 现状审计完成
 
 - **进行中:** 无;等待 AUDIT §9 两个设计决策(D-006 主题策略、D-007 Hero 路径)确认后进入 P0-2。

@@ -5,6 +5,7 @@
 ## D-001 保留 Docsify + Python,不迁移技术栈
 
 **日期:** 2026-10-30
+**状态:**已被 D-009 取代(所有者决定引擎迁移到 VitePress)
 
 - **背景:** 生成的站点视觉偏基础,VitePress / Docusaurus 官网质感更好,存在迁移诱惑。
 - **决策:** 保留 Python `docsite.py` 生成器与 Docsify 渲染,只做视觉设计系统升级。
@@ -13,48 +14,68 @@
 ## D-002 原生 CSS Custom Properties + 少量原生 JS
 
 **日期:** 2026-10-30
+**状态:**已被 D-009 取代(不再自制主题)
 
 - **背景:** 需要品牌色、亮暗主题、排版规范的多站点复用。
-- **决策:** 设计系统全部用 CSS 变量实现(色彩/字体/间距/圆角/阴影/断点),交互增强(主题切换、目录、复制按钮)用少量原生 JS。
-- **理由:** 不引前端框架与 npm 构建链;CSS 变量天然支持主题切换与按项目定制(如 `appearance.accentColor` 覆盖)。
+- **决策:** 设计系统全部用 CSS 变量实现,交互增强用少量原生 JS。
+- **理由:** 不引前端框架与 npm 构建链;CSS 变量天然支持主题切换与按项目定制。
 
 ## D-003 本次范围 P0 + P1,不做主题市场
 
 **日期:** 2026-10-30
+**状态:**范围随 D-009 重构;「不做主题市场/编辑器」继续有效
 
-- **背景:** 完整提案含 P2(工程质量)及更多远期设想(可视化配置编辑器等)。
-- **决策:** 本次只实施 P0(设计系统/首页/正文/导航)+ P1(下载页/配置/阅读辅助)。不做多主题市场、不做编辑器、不加大型动画。
-- **理由:** 控制复杂度,P0+P1 已能让所有下游站点获得明显视觉提升;后续按需迭代。
+- **决策:** 只做聚焦改造,不做多主题市场、可视化配置编辑器、大型动画。
+- **理由:** 控制复杂度。
 
 ## D-004 改造模板源与生成器,不改生成文件
 
 **日期:** 2026-10-30
+**状态:**继续有效(对 VitePress 迁移同样适用)
 
-- **背景:** 生成器通过 `docsite.py update` 刷新各仓库托管文件,模板位于 `template/`。
-- **决策:** 所有改动落在 `template/` 与 `docsite.py`;不直接修改任何项目已生成的 `docs/index.html`。
-- **理由:** 直接改生成文件会在下次 update 时被覆盖,且无法推广到 PixivFlow/TelePost/DAViewer 等下游仓库。
+- **决策:** 所有改动落在 `template/` 与 `docsite.py`;不直接修改任何项目已生成的文件。
+- **理由:** 直接改生成文件会被 update 覆盖,且无法推广到下游仓库。
 
 ## D-005 新配置字段全部有默认值,旧配置零修改可用
 
 **日期:** 2026-10-30
+**状态:**继续有效
 
-- **背景:** 计划扩展 `.docsite.json` 支持 `appearance.accentColor` / `theme` / `homeLayout`。
-- **决策:** 新增字段可选、有默认值;不写新字段的旧配置必须原样正常生成。配置值需严格校验并转义,防 HTML/JS 注入。
-- **理由:** 下游仓库升级模板时不应被迫改配置;配置是用户输入,进入 HTML/JS 前必须安全处理。
+- **决策:** 新增字段可选、有默认值;旧配置必须原样正常工作;配置值严格校验并转义。
+- **理由:** 下游仓库升级不应被迫改配置;配置是用户输入,进入模板前必须安全处理。
 
 ## D-006 主题策略:叠加覆盖,不替换 vendored 主题
 
 **日期:** 2026-10-30(所有者授权代理自行决定)
-
-- **背景:** 方案 B(自研完整主题替换 vue.css/dark.css)完全掌控但需重写 search 弹窗/cover/app-nav/进度条等全部 docsify UI,6+ 下游仓库一次性承担回归风险。
-- **决策:** 保留 vendored vue.css + dark.css 作底座,新增 `styles/tokens.css`、`themes.css`、`layout.css`、`components.css` 叠加覆盖;`accentColor` 直接映射 docsify 原生的 `--theme-color` 变量。
-- **理由:** 纯叠加、零回归面;docsify 全部 UI 天然正常;后续可逐步向自研主题演进。详见 AUDIT §5、§9。
+**状态:**已被 D-008 取代(实测叠加方案保留 Docsify 默认质感,所有者否决)
 
 ## D-007 首页 Hero:enhancements.js 路由注入
 
 **日期:** 2026-10-30(所有者授权代理自行决定)
+**状态:**随 D-009 失效(VitePress 原生首页布局)
 
-- **背景:** docsify 原生 coverpage 纯 Markdown 但 cover 与正文二选一,且 `_cover.md` 会成为新的用户文件约定,「Hero + 下方功能卡片」布局不原生。
-- **决策:** `enhancements.js` 检测首页路由,把 `README.md` 渲染结果包进 Hero 壳层(标题/主次按钮/功能卡片),配置驱动;普通 Markdown 首页零改动照常显示。
-- **理由:** 符合 PLAN 的「渐进增强、普通首页不回归」;与 P1-3(右侧 TOC/复制按钮)共用同一脚本;不新增用户文件约定。详见 AUDIT §9。
+## D-008 完整自研主题 + 顶部导航 + 首页/文档双布局(取代 D-006)
 
+**日期:** 2026-10-30(所有者查看首版浏览器截图后否决叠加方案)
+**状态:**已被 D-009 取代;成果完整存档于分支 `archive/docsify-custom-theme`(commit db1916f)
+
+- **决策:** 删除 vue.css/dark.css 引用,自研 CSS 完整接管全部 docsify UI;新增顶部导航;首页/文档双布局。
+- **理由:** 局部美化无法摆脱默认主题质感;但自研主题意味着长期维护一整套前端皮肤,与「轻量工具」定位冲突——此矛盾最终由 D-009 解决。
+
+## D-009 引擎迁移:Docsify → VitePress,docsite 回归纯管理层(取代 D-001/D-002/D-006/D-008)
+
+**日期:** 2026-10-30(所有者定案)
+
+- **背景:** 自研主题路线两次产出均被否(叠加覆盖→完整自研),根因是要么用 CSS 对抗默认主题,要么自己长期维护一整套主题。VitePress 原生提供现代默认主题、本地搜索、亮暗模式、locales、页面目录、代码复制——全部是自研路线需要手写的能力。
+- **决策:**
+  - **VitePress** 负责渲染、路由、主题、搜索、导航;**docsite(Python CLI)** 负责初始化、配置、模板下发、下载页生成、导航转换、质量检查、迁移管理;**GitHub Pages** 继续托管。
+  - 不维护自制前端主题,不复制 Docsify vendor,不手写导航组件。
+  - `_sidebar.md` 仍是唯一导航源,由 Python 生成 VitePress sidebar 配置(`sidebar.generated.mjs`),禁止双份手工维护。
+  - 首页用 `rewrites` 把 `README.md`→`index.md`,不复制、不强制改名。
+  - 中英文用 VitePress `locales`;搜索用内置本地搜索(不引 Algolia);亮暗用默认主题。
+  - `base` 按 `.docsite.json` 仓库名动态生成(GitHub Pages 子路径)。
+  - CLI 扩展:`init/update/check/navcheck` 保留并升级;新增 `migrate`(`--dry-run`、备份、可回滚)与 `build`/`preview`/`dev`(包装 VitePress CLI,Python 不做渲染)。
+  - `.docsite.json` 增加 `engine: "vitepress"`、`engineVersion`、`version: 2`;新 init 默认 VitePress;旧项目必须显式 `migrate`,绝不静默切换。
+  - 部署改为 Node 22 + `npm ci`(锁定 package-lock.json)+ `vitepress build`,保留 Pages 权限/并发/触发分支与下载页 workflow 的显式 dispatch 链路。
+  - 分五阶段实施,docsite 自身先行;业务仓库(PixivFlow/DAViewer/TelePost 等)在 docsite 验证通过后再逐个迁移。
+- **理由:** 自研主题是把 Docsify 的历史包袱换成自己的前端维护包袱;迁移引擎后 docsite 专注擅长的管理层,视觉与功能由成熟引擎供给。代价(引入 Node 构建链、放弃「零构建」宣传语)已被所有者接受。
