@@ -17,6 +17,11 @@
 
 ---
 
+## 2026-10-30 · 收尾复核:配置安全与版本元数据
+
+- **已完成:** .docsite.json 顶层白名单/字段类型、repo/branch 上下文校验;JS token 通过 json.dumps 转义双引号、控制字符和 Unicode 行分隔符。v2 update 同步 engineVersion/version 元数据。
+- **已验证:** 60 个 Python 测试通过(1 skip),含 schema/workflow 注入及双引号上下文回归。旧 v1 测试保持通过。
+
 ## 2026-10-30 · 阶段 4 本地质量门禁通过
 
 - **已验证:** 58 个 Python 测试(1 skip);Node 22.23.4 与本机 Node 24 构建零 dead link。`.agent/verify_browser.cjs` 在临时副本改 base 为 `/PixivFlow/`,加入长代码/长表格 fixture,用 exact release JSON 生成双语下载页后构建并 HTTP 预览。

@@ -35,6 +35,22 @@ ZH_SIDEBAR = """- 开始
 EN_SIDEBAR = "- Docs\n  - [Home](/en/)\n  - [Quick Start](/en/QUICKSTART.md)\n"
 
 
+class ConfigSafetyTestCase(unittest.TestCase):
+    def test_json_escaping_handles_both_quote_contexts(self):
+        value = '"; throw new Error("injected"); //\n\t'
+        rendered = docsite.render_config("'@@NAME@@' \"@@EMOJI@@\"", dict(CFG, name=value, emoji=value))
+        self.assertIn('\\"', rendered)
+        self.assertIn('\\n\\t', rendered)
+        self.assertNotIn('\n', rendered)
+
+    def test_rejects_schema_and_workflow_injection(self):
+        for cfg in [dict(CFG, repo='owner/name\nextra'), dict(CFG, branch='main\n  - bad'),
+                    dict(CFG, ignoreEverything=True), dict(CFG, name=42),
+                    dict(CFG, navigation={'allowSidebarAnchors': 'yes'})]:
+            with self.subTest(cfg=cfg), self.assertRaises(ValueError):
+                docsite.with_defaults(cfg)
+
+
 class LinkConversionTestCase(unittest.TestCase):
     def test_md_suffix_stripped(self):
         self.assertEqual(docsite._vp_link("/QUICKSTART.md"), "/QUICKSTART")

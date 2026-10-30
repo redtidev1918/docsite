@@ -104,7 +104,8 @@ VP_SIDEBAR_HEADER = (
 
 def _js_escape(s):
     """JS 单引号字符串上下文的最小转义(config.mts 里的 '@@TOKEN@@')。"""
-    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\r", "").replace("\n", "\\n")
+    return (json.dumps(s, ensure_ascii=False)[1:-1].replace("'", "\\'")
+            .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
 
 
 def _base_for(repo):
@@ -115,6 +116,7 @@ def _base_for(repo):
 
 def render_config(text, cfg):
     """渲染 config.mts 模板;token 值先过单引号转义再进模板。"""
+    validate_config(cfg)
     tokens = {
         "NAME": cfg["name"],
         "EMOJI": cfg["emoji"],
@@ -269,6 +271,7 @@ def _write_v2_managed(cfg, root=".", verbose=True):
 
 def _v2_config(cfg):
     """v2 配置字段:engine/engineVersion 固定,version 升 2(其余字段原样保留)。"""
+    validate_config(cfg)
     out = dict(cfg)
     out["engine"] = "vitepress"
     out["engineVersion"] = engine_version()
@@ -287,8 +290,35 @@ def origin_slug():
     return f"{m.group(1)}/{m.group(2)}" if m else None
 
 
+def validate_config(cfg):
+    """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
+    allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
+               "version", "engine", "engineVersion", "navigation"}
+    if not isinstance(cfg, dict):
+        raise ValueError(".docsite.json 必须是对象")
+    unknown = set(cfg) - allowed
+    if unknown:
+        raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
+    for key in allowed - {"version", "navigation"}:
+        if key in cfg and not isinstance(cfg[key], str):
+            raise ValueError(f".docsite.json {key} 必须是字符串")
+    if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
+        raise ValueError("repo 必须是 owner/name")
+    if "branch" in cfg and not re.fullmatch(r"[A-Za-z0-9_./-]+", cfg["branch"]):
+        raise ValueError("branch 含非法字符")
+    if "version" in cfg and (type(cfg["version"]) is not int or cfg["version"] not in (1, 2)):
+        raise ValueError("version 必须是 1 或 2")
+    if "engine" in cfg and cfg["engine"] not in ("docsify", "vitepress"):
+        raise ValueError("engine 必须是 docsify 或 vitepress")
+    nav = cfg.get("navigation", {})
+    if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
+                                         or not isinstance(v, bool) for k, v in nav.items()):
+        raise ValueError("navigation 仅允许 allowSidebarAnchors/allowCombinedLocales 布尔字段")
+
+
 def with_defaults(cfg):
     """补全渲染所需字段；缺失值按 git remote / 仓库名推导，绝不覆盖已写死的配置。"""
+    validate_config(cfg)
     slug = cfg.get("repo") or origin_slug() or "owner/name"
     name = cfg.get("name") or slug.split("/")[-1]
     cfg.setdefault("repo", slug)
@@ -434,6 +464,8 @@ def cmd_update(_args):
 
     if is_vitepress("."):
         print("VitePress(v2)托管文件刷新:")
+        cfg = _v2_config(cfg)
+        write_file(CONFIG, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", True)
         _write_v2_managed(cfg)
         print("完成。Markdown 内容未改动，检查 diff 后提交即可。")
         return
@@ -640,7 +672,8 @@ def _nav_config(root):
         return cfg, problems
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
+        validate_config(doc)
+    except ValueError as e:
         return cfg, [f".docsite.json 不是合法 JSON（{e}）"]
     nav = doc.get("navigation")
     if nav is None:
@@ -925,7 +958,7 @@ def cmd_migrate(args):
             backups.append((f"{f.relative_to(root).as_posix()}.docsite.bak", f.relative_to(root).as_posix()))
     old_wf = root / ".github/workflows/docs.yml"
     if old_wf.is_file() and is_managed(old_wf):
-        backups.append(("docs.yml.docsite.bak", Path(".github/workflows/docs.yml")))
+        backups.append((".github/workflows/docs.yml.docsite.bak", ".github/workflows/docs.yml"))
 
     # 2. 旧 Pages workflow(static.yml 等):解析 cp 拷贝物,报告;改名停用(等效备份)
     for wf, copies in _analyze_pages_workflow(root):
@@ -1224,7 +1257,10 @@ def main():
         d.set_defaults(func=cmd_run_docs, cmd=name)
 
     args = p.parse_args()
-    sys.exit(args.func(args) or 0)
+    try:
+        sys.exit(args.func(args) or 0)
+    except ValueError as error:
+        sys.exit(f"配置错误: {error}")
 
 
 if __name__ == "__main__":
