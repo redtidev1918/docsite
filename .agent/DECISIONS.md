@@ -41,3 +41,20 @@
 - **背景:** 计划扩展 `.docsite.json` 支持 `appearance.accentColor` / `theme` / `homeLayout`。
 - **决策:** 新增字段可选、有默认值;不写新字段的旧配置必须原样正常生成。配置值需严格校验并转义,防 HTML/JS 注入。
 - **理由:** 下游仓库升级模板时不应被迫改配置;配置是用户输入,进入 HTML/JS 前必须安全处理。
+
+## D-006 主题策略:叠加覆盖,不替换 vendored 主题
+
+**日期:** 2026-10-30(所有者授权代理自行决定)
+
+- **背景:** 方案 B(自研完整主题替换 vue.css/dark.css)完全掌控但需重写 search 弹窗/cover/app-nav/进度条等全部 docsify UI,6+ 下游仓库一次性承担回归风险。
+- **决策:** 保留 vendored vue.css + dark.css 作底座,新增 `styles/tokens.css`、`themes.css`、`layout.css`、`components.css` 叠加覆盖;`accentColor` 直接映射 docsify 原生的 `--theme-color` 变量。
+- **理由:** 纯叠加、零回归面;docsify 全部 UI 天然正常;后续可逐步向自研主题演进。详见 AUDIT §5、§9。
+
+## D-007 首页 Hero:enhancements.js 路由注入
+
+**日期:** 2026-10-30(所有者授权代理自行决定)
+
+- **背景:** docsify 原生 coverpage 纯 Markdown 但 cover 与正文二选一,且 `_cover.md` 会成为新的用户文件约定,「Hero + 下方功能卡片」布局不原生。
+- **决策:** `enhancements.js` 检测首页路由,把 `README.md` 渲染结果包进 Hero 壳层(标题/主次按钮/功能卡片),配置驱动;普通 Markdown 首页零改动照常显示。
+- **理由:** 符合 PLAN 的「渐进增强、普通首页不回归」;与 P1-3(右侧 TOC/复制按钮)共用同一脚本;不新增用户文件约定。详见 AUDIT §9。
+
