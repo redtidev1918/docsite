@@ -19,7 +19,7 @@ VitePress 引擎使用 Node.js 22+ 与 npm ci；Python 标准库管理层负责�
 
 README.md 与 en/README.md 经 rewrites 发布为 `/` 与 `/en/`；`_sidebar.md` 不作为页面发布。无需自制 index.html、vendor 或自定义主题。旧模板仍仅用于未 migrate 的 v1 仓库。
 
-`.docsite.json` 顶层仅接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation；未知字段与错误类型拒绝。v1 字段可缺省，navigation 的两个布尔例外见[导航契约](/NAVIGATION.md)。
+`.docsite.json` 顶层接受 repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode；未知字段与错误类型拒绝。packageMode 可设 managed（默认，整体托管依赖文件）或 merge（保留已有 Node 项目，只合并 docs scripts 与 VitePress 依赖）。v1 字段可缺省，navigation 的两个布尔例外见[导航契约](/NAVIGATION.md)。
 
 ## 语言与文件命名
 

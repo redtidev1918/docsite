@@ -17,7 +17,7 @@ VitePress requires Node.js 22+ and npm ci. Python's standard library manages pro
 
 README.md and en/README.md are rewritten to `/` and `/en/`. Sidebar Markdown is excluded from page output. V2 needs no custom index.html, vendored frontend or custom theme. Legacy templates remain only for unmigrated v1 projects.
 
-The .docsite.json top-level whitelist is repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation. Unknown fields and invalid types are rejected; legacy fields retain defaults. See [Navigation](/en/NAVIGATION.md) for the two boolean exceptions.
+The .docsite.json fields are repo/name/emoji/description/branch/themeKey/version/engine/engineVersion/navigation/packageMode. PackageMode is managed by default, or merge to preserve an existing Node project and add only documentation scripts and VitePress. Unknown fields and invalid types are rejected; legacy fields retain defaults. See [Navigation](/en/NAVIGATION.md) for the two boolean exceptions.
 
 ## Languages and names
 

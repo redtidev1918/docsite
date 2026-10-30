@@ -16,7 +16,9 @@ python3 /tmp/docsite/docsite.py preview
 
 Update refreshes package.json/lock, config.mts, generated sidebar, docs.yml, public/.nojekyll and download-page tooling, and adds missing ignore entries. It never changes user Markdown, including `_sidebar.md`. Edit `.docsite.json` and sidebar sources, not generated files.
 
-**Existing Node projects:** the root package.json and lock are replaced by managed templates. Non-managed files are backed up before takeover; numbered backups preserve earlier copies. Manually merge application scripts, dependencies and lockfile during PR review. Custom fields currently produce DRIFT under the byte-for-byte check and are replaced by subsequent updates. Evaluate this limitation before adopting docsite in a complex Node project.
+For an existing Node project, set `"packageMode": "merge"` in .docsite.json, or use `init --package-mode merge`. Update adds docs:* scripts and the pinned VitePress devDependency while keeping application fields and the original lock. Run `npm install` afterwards to update the lock. A different existing docs:* command causes an error and must be merged manually.
+
+The default managed mode replaces the whole package.json/lock from templates and suits standalone documentation projects. Non-managed files are backed up first; numbered backups preserve earlier copies.
 
 For dependency upgrades, change the template's pinned package version, run `npm install` in template/ to update its lock, then run update and npm ci in each target. After manually merging dependencies, run npm install to regenerate the target lock. V2 update automatically synchronizes engineVersion/version in .docsite.json.
 
