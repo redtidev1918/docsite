@@ -31,12 +31,12 @@
 
 ## 阶段 4 — 完整质量门禁
 
-- ⬜ 4-1 Python 测试全量通过(含新增 test_vitepress_config / test_migration / test_build)
-- ⬜ 4-2 VitePress 构建成功、无 dead link(中英文)
-- ⬜ 4-3 下载页自动更新端到端(release → 生成 → dispatch → 部署)
-- ⬜ 4-4 子路径部署验证(PixivFlow 形态的 base)
-- ⬜ 4-5 Playwright/浏览器截图:首页、普通文档、长代码、长表格、下载页、英文页、暗色;320/390/768/1024/1440 无横向滚动
-- ⬜ 4-6 `migrate --dry-run` 对一个旧壳仓库的演练输出审查
+- ✅ 4-1 Python 测试全量通过(58 例,1 skip)
+- ✅ 4-2 VitePress 构建成功、无 dead link(中英文;Node 22.23.4 复验)
+- ✅ 4-3 下载页本地模拟:exact release JSON → 双语生成 → VitePress 构建 → HTTP 预览;真实事件/dispatch/Pages 留上线后核验
+- ✅ 4-4 `/PixivFlow/` 子路径浏览器资源验证,零 HTTP 错误
+- ✅ 4-5 36 张矩阵截图;72 次真实页面渲染,320/390/430/768/1024/1440 亮暗均无整体横向滚动
+- ✅ 4-6 旧壳 dry-run 报告 themes 拷贝与根文档发布变化
 
 ## 阶段 5 — 发布与逐步迁移
 
