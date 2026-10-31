@@ -189,6 +189,49 @@ class GeneratorTestCase(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("DRIFT", r.stdout)
 
+    def test_show_asset_table_default_keeps_table_and_auto_note(self):
+        self.write_payload(make_payload(assets=TELPOST_ASSETS))
+        r = self.run_gen(config=self.write_config({}))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        zh = self.page("docs/download.md")
+        en = self.page("docs/en/download.md")
+        self.assertIn("根据发布资产生成", zh)
+        self.assertIn("generates this page from release assets", en)
+        self.assertIn("SHA256SUMS", zh)
+        self.assertIn("RELEASE-METADATA.json", en)
+
+    def test_show_asset_table_false_hides_assets_and_auto_note(self):
+        self.write_payload(make_payload(assets=TELPOST_ASSETS))
+        r = self.run_gen(config=self.write_config({"showAssetTable": False}))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        zh = self.page("docs/download.md")
+        en = self.page("docs/en/download.md")
+        for page in (zh, en):
+            # No asset rows and no auto-note in either language…
+            self.assertNotIn("SHA256SUMS", page)
+            self.assertNotIn("RELEASE-METADATA.json", page)
+            self.assertNotIn("Linux · x64", page)
+            self.assertNotIn("|---|", page)
+            # …while the release-identity header stays.
+            self.assertIn("<!-- docsite-release-tag: v1.2.3 -->", page)
+        self.assertIn("## 最新版本：`v1.2.3`", zh)
+        self.assertIn("## Latest version: `v1.2.3`", en)
+        self.assertNotIn("根据发布资产生成", zh)
+        self.assertNotIn("generates this page from release assets", en)
+
+    def test_show_asset_table_false_keeps_preview_and_is_idempotent(self):
+        self.write_payload(make_payload(assets=TELPOST_ASSETS))
+        (self.root / "docs").mkdir(parents=True, exist_ok=True)
+        (self.root / "docs" / "download-preview.md").write_text(
+            "PREVIEW-MARKER-123\n", encoding="utf-8")
+        self.run_gen(config=self.write_config({"showAssetTable": False}))
+        zh = self.page("docs/download.md")
+        self.assertIn("PREVIEW-MARKER-123", zh)
+        self.assertNotIn("| 平台 |", zh)
+        first_bytes = (self.root / "docs/download.md").read_bytes()
+        self.run_gen(config=self.write_config({"showAssetTable": False}))
+        self.assertEqual(first_bytes, (self.root / "docs/download.md").read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()
