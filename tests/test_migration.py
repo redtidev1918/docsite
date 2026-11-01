@@ -285,6 +285,39 @@ class UpdateV2TestCase(unittest.TestCase):
             cwd=self.root, capture_output=True, text=True)
         self.assertNotEqual(run.returncode, 0)
 
+    def test_download_page_flow_default_stays_push(self):
+        import docsite as ds
+        ds._write_v2_managed(CFG, root=self.root, verbose=False)
+        produced = (self.root / ".github/workflows/update-download-page.yml").read_text(encoding="utf-8")
+        self.assertEqual(produced,
+                         (ds.TEMPLATE / "update-download-page.yml").read_text(encoding="utf-8"))
+
+    def test_download_page_flow_pull_request_uses_pr_flow_variant(self):
+        import docsite as ds
+        cfg = dict(CFG, downloadPageFlow="pull-request")
+        ds._write_v2_managed(cfg, root=self.root, verbose=False)
+        produced = (self.root / ".github/workflows/update-download-page.yml").read_text(encoding="utf-8")
+        variant = (ds.TEMPLATE / "update-download-page.pr-flow.yml").read_text(encoding="utf-8")
+        self.assertEqual(produced, variant)
+        self.assertIn("pull-requests: write", produced)
+        # The default variant must be untouched so other repositories keep
+        # byte-identical managed files.
+        self.assertNotEqual(produced,
+                            (ds.TEMPLATE / "update-download-page.yml").read_text(encoding="utf-8"))
+
+    def test_check_passes_for_pull_request_flow_repository(self):
+        import docsite as ds
+        (self.root / ".docsite.json").write_text(
+            json.dumps(dict(CFG, engine="vitepress", engineVersion="1.6.4", version=2,
+                            downloadPageFlow="pull-request")),
+            encoding="utf-8")
+        ds._write_v2_managed(dict(CFG, downloadPageFlow="pull-request"),
+                             root=self.root, verbose=False)
+        run = subprocess.run([sys.executable, str(DOCSITE), "check", str(self.root)],
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertNotIn("DRIFT", run.stdout)
+
 
 class InitV2TestCase(unittest.TestCase):
     def test_migration_preserves_custom_package_and_existing_backup(self):

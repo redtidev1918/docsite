@@ -1,0 +1,138 @@
+# docsite-managed-file: update-download-page.yml
+# docsite-managed-version: 4
+# docsite: managed file, run `python3 docsite.py update` to refresh.
+# 变体:update-download-page.pr-flow.yml — 由 .docsite.json 的
+# "downloadPageFlow": "pull-request" 选择。默认变体(update-download-page.yml)
+# 保持直推;本变体为启用了 ruleset 必需检查、直推会被拒绝的仓库设计。
+#
+# 刷新下载页（docs/download.md 与语言镜像）。
+#
+# 触发方式（按优先级）：
+#   1. workflow_call / workflow_dispatch：传入精确 tag（ReleaseGraph post-release action 的入口）
+#   2. release: published：手工发布或使用 PAT/App 创建的 Release 的兜底（exact tag 取自事件）
+#      —— GITHUB_TOKEN 创建的 Release 不会触发该事件；那种情况必须走入口 1。
+#   3. 不传 tag 时生成器回落到最新 stable Release，并在日志中明确说明。
+#
+# v3（ruleset 必需检查生效后）：
+#   - downloadPageFlow=pull-request 的仓库：直推 main 已被必需检查一律拒绝，改为
+#     自动开 PR（chore/download-page-<tag>）。
+#   - PR 必须用真实 PAT（RELEASE_PLEASE_TOKEN）创建：GITHUB_TOKEN 开的 PR
+#     不会触发 pull_request 型 workflow，必需检查永远 pending。
+#   - 轮询等待必需检查变绿后用同一 PAT squash 合并（与人工合并走完全相同
+#     的门禁，不跳过任何检查）；超时上限 25 分钟 < releasegraph post-release
+#     的 30 分钟 max_wait，超时显式失败（post-release pending 可修复重入）。
+#   - PAT 的 squash 合并会产生 push 事件，docs/** 路径变更自动触发 docs.yml
+#     重建 Pages；无需再显式 dispatch（v2 的 deploy-docs 输入仅保留 API 兼容）。
+name: Update download page
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: false
+      deploy-docs:
+        type: boolean
+        required: false
+        default: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        required: false
+      deploy-docs:
+        type: boolean
+        required: false
+        default: true
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  pull-requests: write # v3：自动开 PR 并在检查通过后合并
+
+concurrency:
+  group: update-download-page
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+      tag: ${{ steps.render.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Resolve exact tag
+        id: resolve
+        run: |
+          EXACT="${{ inputs.tag || github.event.release.tag_name }}"
+          if [ -n "$EXACT" ]; then
+            echo "tag=$EXACT" >> "$GITHUB_OUTPUT"
+            echo "source=explicit" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=latest-stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Regenerate download pages
+        id: render
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          if [ -n "$TAG" ]; then
+            python3 .github/scripts/update_download_page.py "${{ github.repository }}" --tag "$TAG"
+          else
+            python3 .github/scripts/update_download_page.py "${{ github.repository }}"
+          fi
+          echo "tag=${TAG:-latest}" >> "$GITHUB_OUTPUT"
+
+      - name: Open compliant PR (direct pushes to main are ruleset-rejected)
+        id: commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # 真实 PAT 创建 PR：GITHUB_TOKEN 开的 PR 不触发 pull_request workflow，
+          # 必需检查会永远 pending。RELEASE_PLEASE_TOKEN 与 release PR 同源。
+          PAT_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "download page already up to date"
+            exit 0
+          fi
+          branch="chore/download-page-${{ steps.render.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git commit -m "docs: refresh download page (${{ steps.render.outputs.tag }})"
+          git push origin "HEAD:refs/heads/${branch}"
+          GH_TOKEN="$PAT_TOKEN" gh pr create \
+            --base "${{ github.event.repository.default_branch }}" --head "${branch}" \
+            --title "docs: refresh download page (${{ steps.render.outputs.tag }})" \
+            --body "由 update-download-page.yml（v3）自动生成：直推 main 会被必需检查拒绝，改走 PR；检查通过后自动合并。"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Merge after required checks pass
+        # 必需检查（PixivFlow delivery contract 等）通过前合并会被 ruleset 拒绝，
+        # 轮询重试正是要等它变绿——与人工合并走同一门禁。PAT 的 squash 合并会
+        # 触发 push 事件 → docs.yml（docs/** 路径）自动重建 Pages。
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          PAT_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          branch="${{ steps.commit.outputs.branch }}"
+          for i in $(seq 1 25); do
+            if GH_TOKEN="$PAT_TOKEN" gh pr merge "$branch" --squash --delete-branch; then
+              echo "merged after required checks (${i} min)"
+              exit 0
+            fi
+            # 严格必需检查要求最新提交：分支落后时先更新再继续等检查。
+            GH_TOKEN="$PAT_TOKEN" gh pr update-branch "$branch" >/dev/null 2>&1 || true
+            sleep 60
+          done
+          echo "::error::download-page PR $branch 未在 25 分钟内通过必需检查并合并；请人工处理该 PR"
+          exit 1
