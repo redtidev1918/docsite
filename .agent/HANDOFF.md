@@ -122,3 +122,9 @@
 - **未验证:** 仓库代码级审计(docsite.py / template / tests 细节)尚未完成——原定审计用的探索代理在启动时被取消,后续会话需从 TASKS.md P0-1 重新开始。
 - **风险/注意:** 所有者提供的方案中有一个已确认的实现细节:`copy_vendor()` 只复制 `template/assets/vendor/`,新增 styles/ 与 scripts/ 不会被自动发布,P0-7 必须处理;禁止重新引入通配 sidebar alias。
 - **下一步:** TASKS.md → P0-1 现状审计。
+
+## 2026-11-01 · Dependabot 与托管 workflow 的版本冲突
+
+- 根因：下游 Dependabot 升 setup-node v7，而模板仍要求 v6；DAViewer #149、DeviantDrop #75、deviantart-downloader #59 的实际 docs 日志报 docs.yml DRIFT。
+- 修复：只升模板 setup-node 到 v7，自身生成 docs.yml 同步。Node 22/npm cache 不变；未设置 registry-url，不依赖 v7 删除的 dummy NODE_AUTH_TOKEN。
+- 验证：init/update 回归先在旧模板失败；修复后 Python 套件、VitePress build、无 .git 副本 check 9/9、navcheck 通过。GitHub CI/下游传播待验收。

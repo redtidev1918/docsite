@@ -318,6 +318,17 @@ class InitV2TestCase(unittest.TestCase):
             cfg_text = (root / "docs/.vitepress/config.mts").read_text(encoding="utf-8")
             self.assertIn("base: '/pixivflow/'", cfg_text)
             self.assertIn("'🎨 PixivFlow'", cfg_text)
+            workflow = root / ".github/workflows/docs.yml"
+            self.assertIn("actions/setup-node@v7", workflow.read_text())
+            self.assertIn("node-version: 22", workflow.read_text())
+            self.assertIn("cache: npm", workflow.read_text())
+            # A downstream Dependabot edit must match the upstream generator;
+            # update remains idempotent and does not revert it to the old major.
+            before = workflow.read_bytes()
+            updated = subprocess.run([sys.executable, str(DOCSITE), "update"], cwd=root,
+                                     capture_output=True, text=True)
+            self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
+            self.assertEqual(workflow.read_bytes(), before)
             # 不再创建 Docsify 外壳
             self.assertFalse((root / "docs/index.html").exists())
             self.assertFalse((root / "docs/assets").exists())

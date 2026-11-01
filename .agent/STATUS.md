@@ -31,3 +31,7 @@
 
 - 进行中:导航 CI 修复 PR 交付,后续按六站重建范围推进试点。
 - 旧 preview(4173)已关闭,其占用 esbuild 导致的 npm ci EPERM 已修复并重装成功。截图使用系统 Edge。
+
+## 2026-11-01 setup-node 模板对齐
+
+修复分支 codex/fix-setup-node-template：VitePress 模板由 setup-node v6 升至 v7，保留 Node 22/npm cache。init/update 回归覆盖生成内容与幂等性；本地 unittest、build、无 .git check/navcheck 已通过，远端 CI 待验证。

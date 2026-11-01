@@ -27,3 +27,7 @@
 
 - 仓库文档中英文双语,改文档时两套都要同步,否则 Pages 上的英文页与中文页会漂移。
 - 提交风格:conventional commits(`fix:`、`docs:` 等前缀,见近期提交历史)。
+
+## 托管 workflow 与 Dependabot（2026-11-01）
+
+Dependabot 对生成文件的升级必须与模板源一致。先更新上游模板并验证 init/update，再固定上游 SHA 下发；不能关掉 docs-check 或用手改下游文件长期掩盖 DRIFT。
