@@ -49,5 +49,12 @@ jobs:
             git clone --quiet --depth 1 "https://github.com/redtidev1918/$r" "repos/$r"
           done
 
+      # NekoTime keeps canonical documents at the repository root and generates
+      # ignored docs/ copies before VitePress builds. Check the same page tree.
+      # Run separately from cloning so the repository-read token is not exposed.
+      - name: Prepare NekoTime documentation pages
+        working-directory: repos/NekoTime
+        run: node .github/scripts/prepare-docs.mjs
+
       - name: Run navcheck
         run: python3 docsite.py navcheck --all repos
