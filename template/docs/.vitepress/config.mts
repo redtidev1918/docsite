@@ -55,7 +55,7 @@ export default defineConfig({
     },
   },
   themeConfig: {
-    sidebar,
+@@I18N_ROUTING@@    sidebar,
     search: {
       provider: 'local',
       options: {

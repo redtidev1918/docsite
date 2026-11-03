@@ -152,6 +152,8 @@ def render_config(text, cfg):
     def sub(m):
         return _js_escape(tokens[m.group(1)])
     text = text.replace("@@REWRITES@@", json.dumps(VP_REWRITES))
+    routing = "    i18nRouting: false,\n" if cfg.get("i18nRouting") is False else ""
+    text = text.replace("@@I18N_ROUTING@@", routing)
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
 
 
@@ -345,13 +347,13 @@ def validate_config(cfg):
     """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
     allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
                "version", "engine", "engineVersion", "navigation", "packageMode",
-               "contentPaths", "downloadPageFlow"}
+               "contentPaths", "downloadPageFlow", "i18nRouting"}
     if not isinstance(cfg, dict):
         raise ValueError(".docsite.json 必须是对象")
     unknown = set(cfg) - allowed
     if unknown:
         raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
-    for key in allowed - {"version", "navigation", "contentPaths"}:
+    for key in allowed - {"version", "navigation", "contentPaths", "i18nRouting"}:
         if key in cfg and not isinstance(cfg[key], str):
             raise ValueError(f".docsite.json {key} 必须是字符串")
     if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
@@ -369,6 +371,8 @@ def validate_config(cfg):
     paths = cfg.get("contentPaths", [])
     if not isinstance(paths, list) or any(not isinstance(p, str) or not p or "\n" in p or "\r" in p for p in paths):
         raise ValueError("contentPaths 必须是非空单行路径字符串组成的数组")
+    if "i18nRouting" in cfg and not isinstance(cfg["i18nRouting"], bool):
+        raise ValueError("i18nRouting 必须是布尔值")
     nav = cfg.get("navigation", {})
     if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
                                          or not isinstance(v, bool) for k, v in nav.items()):

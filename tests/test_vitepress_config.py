@@ -141,6 +141,12 @@ class RenderConfigTestCase(unittest.TestCase):
         cfg = dict(CFG, description="line1\nline2")
         self.assertIn("'line1\\nline2'", docsite.render_config(self.TEMPLATE, cfg))
 
+    def test_locale_switch_can_link_to_home_for_asymmetric_docs(self):
+        token = "@@I18N_ROUTING@@"
+        self.assertEqual(docsite.render_config(token, CFG), "")
+        self.assertIn("i18nRouting: false",
+                      docsite.render_config(token, dict(CFG, i18nRouting=False)))
+
     def test_real_template_renders_without_leftover_tokens(self):
         tpl = (DOCSITE.parent / "template/docs/.vitepress/config.mts").read_text(encoding="utf-8")
         self.assertNotIn("@@", docsite.render_config(tpl, CFG))
