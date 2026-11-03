@@ -112,6 +112,9 @@ def render(text, cfg):
 # VitePress(v2 引擎)托管文件的渲染与生成。
 # config.mts 的 token 全部处于 JS 单引号字符串上下文,一律转义(D-005:
 # 未校验的用户字符串不得拼进 JS);base 由 repo 推导,不接受配置覆盖。
+VP_REWRITES = {"README.md": "index.md", "en/README.md": "en/index.md"}
+VP_HOME_ROUTES = {"/" + source: "/" + dest[:-len("index.md")]
+                  for source, dest in VP_REWRITES.items()}
 VP_CONFIG_REL = Path("docs/.vitepress/config.mts")
 VP_SIDEBAR_REL = Path("docs/.vitepress/sidebar.generated.mjs")
 VP_SIDEBAR_HEADER = (
@@ -148,6 +151,9 @@ def render_config(text, cfg):
     }
     def sub(m):
         return _js_escape(tokens[m.group(1)])
+    text = text.replace("@@REWRITES@@", json.dumps(VP_REWRITES))
+    routing = "    i18nRouting: false,\n" if cfg.get("i18nRouting") is False else ""
+    text = text.replace("@@I18N_ROUTING@@", routing)
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
 
 
@@ -156,7 +162,10 @@ def _vp_link(target):
     if target is None or _is_external(target):
         return target
     page, _, anchor = target.partition("#")
-    if page.endswith(".md"):
+    source = page if page.endswith(".md") else page + ".md"
+    if source in VP_HOME_ROUTES:
+        page = VP_HOME_ROUTES[source]
+    elif page.endswith(".md"):
         page = page[: -len(".md")]
     return f"{page}#{anchor}" if anchor else page
 
@@ -338,13 +347,13 @@ def validate_config(cfg):
     """配置白名单;阻止类型错误和 workflow/base 上下文注入,兼容缺省 v1 字段。"""
     allowed = {"repo", "name", "emoji", "description", "branch", "themeKey",
                "version", "engine", "engineVersion", "navigation", "packageMode",
-               "contentPaths", "downloadPageFlow"}
+               "contentPaths", "downloadPageFlow", "i18nRouting"}
     if not isinstance(cfg, dict):
         raise ValueError(".docsite.json 必须是对象")
     unknown = set(cfg) - allowed
     if unknown:
         raise ValueError(f".docsite.json 未知字段: {', '.join(sorted(unknown))}")
-    for key in allowed - {"version", "navigation", "contentPaths"}:
+    for key in allowed - {"version", "navigation", "contentPaths", "i18nRouting"}:
         if key in cfg and not isinstance(cfg[key], str):
             raise ValueError(f".docsite.json {key} 必须是字符串")
     if "repo" in cfg and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cfg["repo"]):
@@ -362,6 +371,8 @@ def validate_config(cfg):
     paths = cfg.get("contentPaths", [])
     if not isinstance(paths, list) or any(not isinstance(p, str) or not p or "\n" in p or "\r" in p for p in paths):
         raise ValueError("contentPaths 必须是非空单行路径字符串组成的数组")
+    if "i18nRouting" in cfg and not isinstance(cfg["i18nRouting"], bool):
+        raise ValueError("i18nRouting 必须是布尔值")
     nav = cfg.get("navigation", {})
     if not isinstance(nav, dict) or any(k not in {"allowSidebarAnchors", "allowCombinedLocales"}
                                          or not isinstance(v, bool) for k, v in nav.items()):
@@ -856,19 +867,15 @@ def _check_vp_targets(name, path, root, issues):
     `/en/` 查 docs/en/README.md;`.md` 后缀可有可无(转换器已去后缀)。
     """
     root = Path(root)
+    home_sources = {route: source.lstrip("/") for source, route in VP_HOME_ROUTES.items()}
     for _indent, label, target in _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")):
         if target is None or _is_external(target):
             continue
-        page = target.split("#")[0]
+        page = _vp_link(target).split("#")[0]
         if not page.startswith("/"):
             continue  # 相对链接交给 NOT_ROOT_ABSOLUTE 提示
-        rel = page.strip("/")
-        if rel in ("", "en"):
-            ok = (root / "docs" / rel / "README.md").is_file()
-        else:
-            if not rel.endswith(".md"):
-                rel += ".md"
-            ok = (root / "docs" / rel).is_file()
+        rel = home_sources.get(page, page.strip("/") + ".md")
+        ok = (root / "docs" / rel).is_file()
         if not ok:
             issues.append((name, "BROKEN_SIDEBAR_LINK",
                            f"「{label}」-> `{target}` 在 docs/ 下不存在（VitePress 路由）", "error"))

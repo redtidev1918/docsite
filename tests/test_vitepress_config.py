@@ -72,6 +72,11 @@ class LinkConversionTestCase(unittest.TestCase):
         self.assertEqual(docsite._vp_link("https://example.com/"), "https://example.com/")
         self.assertEqual(docsite._vp_link(None), None)
 
+    def test_home_rewrites_preserve_fragments_and_other_readmes(self):
+        self.assertEqual(docsite._vp_link("/README.md"), "/")
+        self.assertEqual(docsite._vp_link("/en/README#intro"), "/en/#intro")
+        self.assertEqual(docsite._vp_link("/themes/README.md"), "/themes/README")
+
     def test_anchor_preserved(self):
         self.assertEqual(docsite._vp_link("/CONVENTIONS.md#files"), "/CONVENTIONS#files")
 
@@ -135,6 +140,12 @@ class RenderConfigTestCase(unittest.TestCase):
     def test_description_newline_escaped(self):
         cfg = dict(CFG, description="line1\nline2")
         self.assertIn("'line1\\nline2'", docsite.render_config(self.TEMPLATE, cfg))
+
+    def test_locale_switch_can_link_to_home_for_asymmetric_docs(self):
+        token = "@@I18N_ROUTING@@"
+        self.assertEqual(docsite.render_config(token, CFG), "")
+        self.assertIn("i18nRouting: false",
+                      docsite.render_config(token, dict(CFG, i18nRouting=False)))
 
     def test_real_template_renders_without_leftover_tokens(self):
         tpl = (DOCSITE.parent / "template/docs/.vitepress/config.mts").read_text(encoding="utf-8")
