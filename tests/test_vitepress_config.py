@@ -72,6 +72,11 @@ class LinkConversionTestCase(unittest.TestCase):
         self.assertEqual(docsite._vp_link("https://example.com/"), "https://example.com/")
         self.assertEqual(docsite._vp_link(None), None)
 
+    def test_home_rewrites_preserve_fragments_and_other_readmes(self):
+        self.assertEqual(docsite._vp_link("/README.md"), "/")
+        self.assertEqual(docsite._vp_link("/en/README#intro"), "/en/#intro")
+        self.assertEqual(docsite._vp_link("/themes/README.md"), "/themes/README")
+
     def test_anchor_preserved(self):
         self.assertEqual(docsite._vp_link("/CONVENTIONS.md#files"), "/CONVENTIONS#files")
 

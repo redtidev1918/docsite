@@ -112,6 +112,9 @@ def render(text, cfg):
 # VitePress(v2 引擎)托管文件的渲染与生成。
 # config.mts 的 token 全部处于 JS 单引号字符串上下文,一律转义(D-005:
 # 未校验的用户字符串不得拼进 JS);base 由 repo 推导,不接受配置覆盖。
+VP_REWRITES = {"README.md": "index.md", "en/README.md": "en/index.md"}
+VP_HOME_ROUTES = {"/" + source: "/" + dest[:-len("index.md")]
+                  for source, dest in VP_REWRITES.items()}
 VP_CONFIG_REL = Path("docs/.vitepress/config.mts")
 VP_SIDEBAR_REL = Path("docs/.vitepress/sidebar.generated.mjs")
 VP_SIDEBAR_HEADER = (
@@ -148,6 +151,7 @@ def render_config(text, cfg):
     }
     def sub(m):
         return _js_escape(tokens[m.group(1)])
+    text = text.replace("@@REWRITES@@", json.dumps(VP_REWRITES))
     return re.sub(r"@@([A-Z_]+)@@", sub, text)
 
 
@@ -156,7 +160,10 @@ def _vp_link(target):
     if target is None or _is_external(target):
         return target
     page, _, anchor = target.partition("#")
-    if page.endswith(".md"):
+    source = page if page.endswith(".md") else page + ".md"
+    if source in VP_HOME_ROUTES:
+        page = VP_HOME_ROUTES[source]
+    elif page.endswith(".md"):
         page = page[: -len(".md")]
     return f"{page}#{anchor}" if anchor else page
 
@@ -856,19 +863,15 @@ def _check_vp_targets(name, path, root, issues):
     `/en/` 查 docs/en/README.md;`.md` 后缀可有可无(转换器已去后缀)。
     """
     root = Path(root)
+    home_sources = {route: source.lstrip("/") for source, route in VP_HOME_ROUTES.items()}
     for _indent, label, target in _sidebar_items(path.read_text(encoding="utf-8", errors="ignore")):
         if target is None or _is_external(target):
             continue
-        page = target.split("#")[0]
+        page = _vp_link(target).split("#")[0]
         if not page.startswith("/"):
             continue  # 相对链接交给 NOT_ROOT_ABSOLUTE 提示
-        rel = page.strip("/")
-        if rel in ("", "en"):
-            ok = (root / "docs" / rel / "README.md").is_file()
-        else:
-            if not rel.endswith(".md"):
-                rel += ".md"
-            ok = (root / "docs" / rel).is_file()
+        rel = home_sources.get(page, page.strip("/") + ".md")
+        ok = (root / "docs" / rel).is_file()
         if not ok:
             issues.append((name, "BROKEN_SIDEBAR_LINK",
                            f"「{label}」-> `{target}` 在 docs/ 下不存在（VitePress 路由）", "error"))
